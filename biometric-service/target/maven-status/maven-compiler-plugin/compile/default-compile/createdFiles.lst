@@ -1,0 +1,4 @@
+com\scb\biometrics\dto\VerifyResponse.class
+com\scb\biometrics\App.class
+com\scb\biometrics\dto\VerifyRequest.class
+com\scb\biometrics\BiometricService.class
