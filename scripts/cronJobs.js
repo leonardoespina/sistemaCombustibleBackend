@@ -1,6 +1,7 @@
 const cron = require("node-cron");
-const { Solicitud, CupoActual, sequelize } = require("../models");
+const { Solicitud, CupoActual, CupoBase, sequelize } = require("../models");
 const { Op } = require("sequelize");
+const moment = require("moment");
 
 const initCronJobs = (io) => {
   // RF-07: Cierre Diario a las 11:59 PM (23:59)
@@ -11,9 +12,6 @@ const initCronJobs = (io) => {
     try {
       // 1. Buscar solicitudes activas que no fueron despachadas
       // Estados: PENDIENTE, APROBADA, IMPRESA
-      // Nota: Si quisiéramos filtrar solo las de HOY, agregaríamos where fecha_solicitud
-      // Pero la regla es "Si no ha sido despachada... se anula".
-      // Cualquier solicitud vieja en estos estados debería morir también.
       const solicitudesVencidas = await Solicitud.findAll({
         where: {
           estado: { [Op.in]: ["PENDIENTE", "APROBADA", "IMPRESA"] }
@@ -24,19 +22,25 @@ const initCronJobs = (io) => {
       console.log(`Encontradas ${solicitudesVencidas.length} solicitudes para vencer.`);
 
       for (const sol of solicitudesVencidas) {
-        // 2. Reintegrar Cupo
-        // Buscamos el cupo actual de la subdependencia
+        // 2. Reintegrar Cupo (RF-14)
+        // Buscamos el cupo actual de la subdependencia a través de CupoBase
+        const periodoActual = moment().format("YYYY-MM");
         const cupo = await CupoActual.findOne({
-          where: {
-            id_subdependencia: sol.id_subdependencia,
-            id_tipo_combustible: sol.id_tipo_combustible
-          },
+          where: { periodo: periodoActual },
+          include: [{
+            model: CupoBase,
+            as: "CupoBase",
+            where: {
+              id_subdependencia: sol.id_subdependencia,
+              id_tipo_combustible: sol.id_tipo_combustible
+            }
+          }],
           transaction: t
         });
 
         if (cupo) {
-          // Devolvemos los litros a 'cantidad_actual' (disponible)
-          await cupo.increment("cantidad_actual", { by: sol.cantidad_litros, transaction: t });
+          // Devolvemos los litros a 'cantidad_disponible'
+          await cupo.increment("cantidad_disponible", { by: sol.cantidad_litros, transaction: t });
           // Restamos de 'cantidad_consumida'
           await cupo.decrement("cantidad_consumida", { by: sol.cantidad_litros, transaction: t });
         }
@@ -52,7 +56,7 @@ const initCronJobs = (io) => {
       if (io) io.emit("cierre:diario", { msg: "Cierre diario ejecutado", cantidad: solicitudesVencidas.length });
 
     } catch (error) {
-      await t.rollback();
+      if (!t.finished) await t.rollback();
       console.error("ERROR EN CIERRE DIARIO:", error);
     }
   });

@@ -12,7 +12,6 @@ const Solicitud = sequelize.define(
     codigo_ticket: {
       type: DataTypes.STRING(20),
       allowNull: true,
-      unique: true,
       comment: "Generado al imprimir: [B/R][CodDep][Correlativo]",
     },
     id_usuario: {
@@ -153,8 +152,8 @@ const Solicitud = sequelize.define(
     timestamps: false,
     indexes: [
       {
-        fields: ["codigo_ticket"],
         unique: true,
+        fields: ["codigo_ticket"],
       },
       {
         fields: ["placa", "estado"],

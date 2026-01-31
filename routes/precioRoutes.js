@@ -59,6 +59,13 @@ router.get(
   precioController.obtenerPreciosActuales
 );
 
+// GET /api/precios/combustible/:id (Obtener precios actuales por combustible)
+router.get(
+  "/combustible/:id",
+  autenticarUsuario,
+  precioController.obtenerPreciosPorCombustible
+);
+
 // POST /api/precios/actualizar (Actualizar precios de un combustible) - Solo ADMIN
 router.post(
   "/actualizar",

@@ -22,14 +22,20 @@ router.put(
     cupoController.actualizarCupoBase
 );
 
-// --- RUTAS DE ESTADO ACTUAL - ADMIN o SUPERVISOR ---
+// --- RUTAS DE ESTADO ACTUAL - TODOS LOS ROLES AUTENTICADOS ---
 router.get(
     "/actual", 
-    [autenticarUsuario, authorizeRole(["ADMIN"])], 
+    [autenticarUsuario], 
     cupoController.obtenerCuposActuales
 );
 
-// --- RUTAS DE GESTIÓN (Consumo y Recarga) - ADMIN o SUPERVISOR ---
+router.get(
+    "/especifico",
+    [autenticarUsuario],
+    cupoController.obtenerCupoEspecifico
+);
+
+// --- RUTAS DE GESTIÓN (Consumo y Recarga) - Solo ADMIN ---
 router.post(
     "/consumir", 
     [autenticarUsuario, authorizeRole(["ADMIN"])], 

@@ -21,7 +21,7 @@ const server = http.createServer(app);
 const whitelist = [
    
   "http://localhost:5173",
-  "http://10.60.4.195:5173"
+  "http://10.60.6.124:5173"
 ];
 
 const corsOptions = {

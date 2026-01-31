@@ -171,6 +171,21 @@ exports.obtenerPreciosActuales = async (req, res) => {
   }
 };
 
+// Obtener precios actuales para un combustible específico
+exports.obtenerPreciosPorCombustible = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const precios = await PrecioCombustible.findAll({
+      where: { id_tipo_combustible: id, activo: true },
+      include: [{ model: Moneda, as: "Moneda", where: { activo: true } }],
+    });
+    res.json(precios);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ msg: "Error al obtener precios por combustible" });
+  }
+};
+
 // Actualizar Precios para un Combustible
 exports.actualizarPrecios = async (req, res) => {
   const { id_tipo_combustible, precios } = req.body; // precios = { "Bs": 50, "USD": 1.2 }

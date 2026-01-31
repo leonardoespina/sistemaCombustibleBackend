@@ -139,6 +139,38 @@ exports.actualizarCupoBase = async (req, res) => {
 /**
  * Obtener estado de cupos actuales (Vista Principal - Paginada)
  */
+exports.obtenerCupoEspecifico = async (req, res) => {
+  const { id_subdependencia, id_tipo_combustible } = req.query;
+  const periodoActual = moment().format("YYYY-MM");
+
+  if (!id_subdependencia || !id_tipo_combustible) {
+    return res.status(400).json({ msg: "Faltan parámetros: id_subdependencia e id_tipo_combustible son obligatorios." });
+  }
+
+  try {
+    const cupo = await CupoActual.findOne({
+      where: { periodo: periodoActual },
+      include: [{
+        model: CupoBase,
+        as: "CupoBase",
+        where: {
+          id_subdependencia: id_subdependencia || null,
+          id_tipo_combustible: id_tipo_combustible || null
+        }
+      }]
+    });
+
+    if (!cupo) {
+      return res.status(404).json({ msg: "No se encontró cupo para los criterios especificados." });
+    }
+
+    res.json({ data: cupo });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ msg: "Error al obtener el cupo específico" });
+  }
+};
+
 exports.obtenerCuposActuales = async (req, res) => {
   const periodoActual = moment().format("YYYY-MM");
   

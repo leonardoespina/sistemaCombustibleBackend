@@ -1,11 +1,17 @@
 const express = require("express");
 const router = express.Router();
 const solicitudController = require("../controllers/solicitudController");
-const authMiddleware = require("../middlewares/authMiddleware");
+const { autenticarUsuario } = require("../middlewares/authMiddleware");
 
 // Todas las rutas requieren autenticación
-// Se asume que authMiddleware popula req.user y verifica el token
-router.use(authMiddleware);
+// Se asume que authMiddleware popula req.usuario y verifica el token
+router.use(autenticarUsuario);
+
+// Obtener Subdependencias Autorizadas (para filtros)
+router.get("/subdependencias-autorizadas", solicitudController.obtenerSubdependenciasAutorizadas);
+
+// Listar Llenaderos por combustible
+router.get("/llenaderos-por-combustible", solicitudController.obtenerLlenaderosPorCombustible);
 
 // Crear Solicitud
 router.post("/", solicitudController.crearSolicitud);
