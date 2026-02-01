@@ -1,59 +1,25 @@
-const { Solicitud, CupoActual, Subdependencia, Llenadero, TipoCombustible, Vehiculo, Usuario, Biometria, PrecioCombustible, Dependencia, Categoria, CupoBase } = require("../models");
+const { Solicitud, CupoActual, Subdependencia, Llenadero, TipoCombustible, Vehiculo, Usuario, Dependencia, Categoria, CupoBase } = require("../models");
 const { sequelize } = require("../config/database");
 const { paginate } = require("../helpers/paginationHelper");
 const { Op } = require("sequelize");
-const axios = require("axios");
 const moment = require("moment");
 
-// URL del microservicio de verificación biométrica (Misma que en biometriaController)
-const BIOMETRIC_SERVICE_URL = "http://localhost:7000/api/verify";
-
 /**
- * Helper para validar huella contra una cédula/usuario
+ * crearSolicitud
  */
-async function verificarHuella(cedula, muestra) {
-  if (!cedula || !muestra) return false;
-
-  try {
-    const registro = await Biometria.findOne({ where: { cedula, estado: "ACTIVO" } });
-    if (!registro) return false;
-
-    const biometricData = JSON.parse(registro.template);
-    
-    // Comparar contra todos los templates guardados
-    for (const templateGuardado of biometricData.templates) {
-      try {
-        const response = await axios.post(BIOMETRIC_SERVICE_URL, {
-          probe: muestra,
-          candidate: templateGuardado
-        }, { timeout: 5000 });
-        
-        if (response.data.match && response.data.score >= 40) {
-          return { match: true, id_biometria: registro.id_biometria, registro };
-        }
-      } catch (err) {
-        console.error("Error comparando template:", err.message);
-      }
-    }
-  } catch (error) {
-    console.error("Error en servicio biométrico:", error.message);
-  }
-  return false;
-}
-
 exports.crearSolicitud = async (req, res) => {
   console.log("BODY RECIBIDO EN crearSolicitud:", JSON.stringify(req.body, null, 2));
   const t = await sequelize.transaction();
   try {
     // 1. Datos del Usuario (detectados del token)
-    const { id_usuario } = req.usuario; 
-    
+    const { id_usuario } = req.usuario;
+
     // 2. Datos del Body (todos los campos vienen del formulario)
-    const { 
+    const {
       id_vehiculo, placa, marca, modelo, flota,
       id_llenadero, id_tipo_combustible,
       cantidad_litros, tipo_suministro, tipo_solicitud,
-      id_precio, id_subdependencia, id_dependencia, id_categoria 
+      id_precio, id_subdependencia, id_dependencia, id_categoria
     } = req.body;
 
     // 3. Validar Bloqueo de Placa (RF-05)
@@ -72,17 +38,17 @@ exports.crearSolicitud = async (req, res) => {
 
     // 4. Validar Cupo y Reservar (RF-04, RF-06)
     const periodoActual = moment().format("YYYY-MM");
-    
+
     console.log("Buscando cupo_base con:", {
       id_subdependencia: id_subdependencia,
       id_tipo_combustible: id_tipo_combustible
     });
-    
+
     // Primero buscar el cupo base
     const cupoBase = await CupoBase.findOne({
       where: {
         id_subdependencia: id_subdependencia || null,
-        id_tipo_combustible: id_tipo_combustible || null 
+        id_tipo_combustible: id_tipo_combustible || null
       },
       transaction: t
     });
@@ -96,7 +62,7 @@ exports.crearSolicitud = async (req, res) => {
 
     // Buscar o crear el cupo actual para el periodo
     let cupoActual = await CupoActual.findOne({
-      where: { 
+      where: {
         periodo: periodoActual,
         id_cupo_base: cupoBase.id_cupo_base
       },
@@ -108,7 +74,7 @@ exports.crearSolicitud = async (req, res) => {
     if (!cupoActual) {
       const inicioMes = moment(periodoActual, 'YYYY-MM').startOf('month').toDate();
       const finMes = moment(periodoActual, 'YYYY-MM').endOf('month').toDate();
-      
+
       cupoActual = await CupoActual.create({
         id_cupo_base: cupoBase.id_cupo_base,
         periodo: periodoActual,
@@ -120,14 +86,14 @@ exports.crearSolicitud = async (req, res) => {
         fecha_fin: finMes,
         estado: 'ACTIVO'
       }, { transaction: t });
-      
+
       console.log(`Cupo actual creado automáticamente para periodo ${periodoActual}, cupo_base ${cupoBase.id_cupo_base}`);
     }
 
     if (parseFloat(cupoActual.cantidad_disponible) < parseFloat(cantidad_litros)) {
       await t.rollback();
-      return res.status(400).json({ 
-        msg: `Cupo insuficiente. Disponible: ${cupoActual.cantidad_disponible} Lts. Solicitado: ${cantidad_litros} Lts.` 
+      return res.status(400).json({
+        msg: `Cupo insuficiente. Disponible: ${cupoActual.cantidad_disponible} Lts. Solicitado: ${cantidad_litros} Lts.`
       });
     }
 
@@ -138,7 +104,7 @@ exports.crearSolicitud = async (req, res) => {
     // 5. Cálculos de Venta (RF-03)
     let precio_unitario = 0;
     let monto_total = 0;
-    
+
     if (tipo_solicitud === 'VENTA') {
       const sub = await Subdependencia.findByPk(id_subdependencia);
       if (!sub || !sub.cobra_venta) {
@@ -158,7 +124,14 @@ exports.crearSolicitud = async (req, res) => {
       }
     }
 
-    // 6. Crear Solicitud REAL (Almacenamiento en Base de Datos)
+    // 6. Obtener Código de Dependencia para Ticket
+    const depObj = await Dependencia.findByPk(id_dependencia, { transaction: t });
+    if (!depObj) {
+      await t.rollback();
+      return res.status(404).json({ msg: "Dependencia no encontrada para generar ticket." });
+    }
+
+    // 7. Crear Solicitud REAL (Almacenamiento en Base de Datos)
     const nuevaSolicitud = await Solicitud.create({
       id_usuario,
       id_dependencia,
@@ -179,13 +152,25 @@ exports.crearSolicitud = async (req, res) => {
       fecha_solicitud: new Date()
     }, { transaction: t });
 
+    // 8. Generar y Guardar Número de Ticket INMEDIATAMENTE
+    const prefijo = tipo_suministro === 'BIDON' ? 'B' : 'R';
+    const codDep = (depObj.codigo || '000').padStart(3, '0');
+    const correlativo = nuevaSolicitud.id_solicitud.toString().padStart(6, '0');
+    const codigo_ticket = `${prefijo}${codDep}${correlativo}`;
+
+    await nuevaSolicitud.update({ codigo_ticket }, { transaction: t });
+
+    // Asignar el código generado al objeto de respuesta
+    nuevaSolicitud.codigo_ticket = codigo_ticket;
+
     await t.commit();
-    
+
     if (req.io) req.io.emit('solicitud:creada', nuevaSolicitud);
 
-    res.status(201).json({ 
-      msg: "Solicitud enviada exitosamente para aprobación", 
-      data: nuevaSolicitud 
+    res.status(201).json({
+      msg: "Solicitud enviada exitosamente. Ticket generado.",
+      data: nuevaSolicitud,
+      ticket: codigo_ticket
     });
 
   } catch (error) {
@@ -197,7 +182,7 @@ exports.crearSolicitud = async (req, res) => {
 
 exports.aprobarSolicitud = async (req, res) => {
   const { id } = req.params;
-  
+
   try {
     const solicitud = await Solicitud.findByPk(id);
     if (!solicitud) return res.status(404).json({ msg: "Solicitud no encontrada" });
@@ -214,7 +199,7 @@ exports.aprobarSolicitud = async (req, res) => {
     });
 
     if (req.io) req.io.emit('solicitud:actualizada', solicitud);
-    
+
     res.json({ msg: "Solicitud Aprobada", data: solicitud });
   } catch (error) {
     console.error(error);
@@ -222,167 +207,10 @@ exports.aprobarSolicitud = async (req, res) => {
   }
 };
 
-exports.imprimirTicket = async (req, res) => {
-  const { id } = req.params;
-  const { huella_almacenista, huella_receptor } = req.body; 
 
-  if (!huella_almacenista || !huella_receptor) {
-    return res.status(400).json({ msg: "Se requieren las huellas del Almacenista y del Receptor." });
-  }
-
-  const t = await sequelize.transaction();
-  try {
-    const solicitud = await Solicitud.findByPk(id, {
-      include: [{ model: Dependencia }, { model: Usuario, as: 'Solicitante' }],
-      transaction: t
-    });
-
-    if (!solicitud) {
-      await t.rollback();
-      return res.status(404).json({ msg: "Solicitud no encontrada" });
-    }
-
-    if (solicitud.estado !== 'APROBADA') {
-      await t.rollback();
-      return res.status(400).json({ msg: "La solicitud debe estar Aprobada para imprimirse." });
-    }
-
-    // RF-09: Validar Huellas
-    const almacenista = await Usuario.findByPk(req.usuario.id_usuario, { transaction: t });
-    const matchAlmacenista = await verificarHuella(almacenista.cedula, huella_almacenista);
-    if (!matchAlmacenista) {
-      await t.rollback();
-      return res.status(401).json({ msg: "Huella del Almacenista no válida." });
-    }
-
-    const { cedula_receptor } = req.body;
-    if (!cedula_receptor) {
-      await t.rollback();
-      return res.status(400).json({ msg: "Se requiere la cédula del receptor." });
-    }
-
-    const matchReceptor = await verificarHuella(cedula_receptor, huella_receptor);
-    if (!matchReceptor) {
-      await t.rollback();
-      return res.status(401).json({ msg: "Huella del Receptor no coincide con la cédula proporcionada." });
-    }
-
-    // RF-10: Generar Nomenclatura
-    const prefijo = solicitud.tipo_suministro === 'BIDON' ? 'B' : 'R';
-    const codDep = (solicitud.Dependencia.codigo || '000').padStart(3, '0');
-    const correlativo = id.toString().padStart(6, '0');
-    const codigo_ticket = `${prefijo}${codDep}${correlativo}`;
-
-    await solicitud.update({
-      estado: 'IMPRESA',
-      codigo_ticket,
-      fecha_impresion: new Date(),
-      numero_impresiones: 1,
-      id_almacenista: req.usuario.id_usuario,
-      id_receptor: matchReceptor.id_biometria 
-    }, { transaction: t });
-
-    await t.commit();
-    res.json({ 
-      msg: "Ticket generado correctamente", 
-      ticket: {
-        codigo: codigo_ticket,
-        solicitud,
-        receptor: matchReceptor.registro
-      }
-    });
-
-  } catch (error) {
-    await t.rollback();
-    console.error(error);
-    res.status(500).json({ msg: "Error generando ticket" });
-  }
-};
-
-exports.reimprimirTicket = async (req, res) => {
-  const { id } = req.params;
-  try {
-    const solicitud = await Solicitud.findByPk(id);
-    if (!solicitud || (solicitud.estado !== 'IMPRESA' && solicitud.estado !== 'DESPACHADA')) {
-      return res.status(400).json({ msg: "Solo se pueden reimprimir tickets Impresos o Despachados." });
-    }
-
-    await solicitud.increment('numero_impresiones');
-    
-    res.json({
-      msg: "Copia generada",
-      es_copia: true,
-      ticket: {
-        codigo: solicitud.codigo_ticket,
-        solicitud
-      }
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ msg: "Error al reimprimir" });
-  }
-};
-
-exports.despacharSolicitud = async (req, res) => {
-  const { codigo_ticket, cantidad_despachada_real } = req.body;
-  
-  if (!codigo_ticket) return res.status(400).json({ msg: "Código de ticket requerido" });
-
-  const t = await sequelize.transaction();
-  try {
-    const solicitud = await Solicitud.findOne({
-      where: { codigo_ticket },
-      include: [{ model: Llenadero }],
-      transaction: t
-    });
-
-    if (!solicitud) {
-      await t.rollback();
-      return res.status(404).json({ msg: "Ticket no encontrado" });
-    }
-
-    if (solicitud.estado !== 'IMPRESA') {
-      await t.rollback();
-      return res.status(400).json({ msg: `El ticket está en estado ${solicitud.estado} y no puede ser despachado.` });
-    }
-
-    // RF-13: Descuento de Inventario Físico (Llenadero)
-    const llenadero = await Llenadero.findByPk(solicitud.id_llenadero, { transaction: t, lock: true });
-    
-    const cantidadFinal = cantidad_despachada_real ? parseFloat(cantidad_despachada_real) : parseFloat(solicitud.cantidad_litros);
-
-    if (cantidadFinal > parseFloat(solicitud.cantidad_litros)) {
-       await t.rollback();
-       return res.status(400).json({ msg: "No se puede despachar más de lo aprobado." });
-    }
-
-    if (parseFloat(llenadero.disponibilidadActual) < cantidadFinal) {
-        await t.rollback();
-        return res.status(400).json({ msg: "Stock insuficiente en el Llenadero." });
-    }
-
-    await llenadero.decrement('disponibilidadActual', { by: cantidadFinal, transaction: t });
-
-    // Actualizar Solicitud
-    await solicitud.update({
-      estado: 'DESPACHADA',
-      fecha_despacho: new Date(),
-      cantidad_despachada: cantidadFinal
-    }, { transaction: t });
-
-    await t.commit();
-    
-    if (req.io) req.io.emit('solicitud:despachada', solicitud);
-    
-    res.json({ msg: "Despacho registrado exitosamente. Inventario actualizado." });
-
-  } catch (error) {
-    await t.rollback();
-    console.error(error);
-    res.status(500).json({ msg: "Error al registrar despacho" });
-  }
-};
-
+/**
+ * obtenerSubdependenciasAutorizadas
+ */
 exports.obtenerSubdependenciasAutorizadas = async (req, res) => {
   try {
     const { id_usuario, tipo_usuario } = req.usuario;
@@ -416,9 +244,9 @@ exports.obtenerSubdependenciasAutorizadas = async (req, res) => {
 
     let subdependencias = [];
     if (usuarioConSubs?.Dependencia?.Subdependencia) {
-        subdependencias = Array.isArray(usuarioConSubs.Dependencia.Subdependencia) 
-                          ? usuarioConSubs.Dependencia.Subdependencia 
-                          : [usuarioConSubs.Dependencia.Subdependencia];
+      subdependencias = Array.isArray(usuarioConSubs.Dependencia.Subdependencia)
+        ? usuarioConSubs.Dependencia.Subdependencia
+        : [usuarioConSubs.Dependencia.Subdependencia];
     }
 
     res.json(subdependencias);
@@ -431,29 +259,29 @@ exports.obtenerSubdependenciasAutorizadas = async (req, res) => {
 
 exports.listarSolicitudes = async (req, res) => {
   try {
-    let { tipo_usuario, id_usuario, id_dependencia, id_categoria, id_subdependencia } = req.usuario; 
-    
+    let { tipo_usuario, id_usuario, id_dependencia, id_categoria, id_subdependencia } = req.usuario;
+
     if ((!id_categoria && !id_dependencia && !id_subdependencia) && tipo_usuario !== 'ADMIN') {
-        const usuarioFull = await Usuario.findByPk(id_usuario);
-        if (usuarioFull) {
-            id_categoria = usuarioFull.id_categoria;
-            id_dependencia = usuarioFull.id_dependencia;
-            id_subdependencia = usuarioFull.id_subdependencia;
-        }
+      const usuarioFull = await Usuario.findByPk(id_usuario);
+      if (usuarioFull) {
+        id_categoria = usuarioFull.id_categoria;
+        id_dependencia = usuarioFull.id_dependencia;
+        id_subdependencia = usuarioFull.id_subdependencia;
+      }
     }
 
     const where = {};
 
     if (tipo_usuario === 'ALMACENISTA' || tipo_usuario === 'SOLICITANTE') {
       if (tipo_usuario !== 'ALMACENISTA') {
-          where.id_usuario = id_usuario;
+        where.id_usuario = id_usuario;
       }
     }
-    
+
     if (tipo_usuario === 'GERENTE' || tipo_usuario === 'JEFE DIVISION') {
-       if (id_dependencia) {
-         where.id_dependencia = id_dependencia;
-       }
+      if (id_dependencia) {
+        where.id_dependencia = id_dependencia;
+      }
     }
 
     if (req.query.estado) where.estado = req.query.estado;
@@ -468,8 +296,8 @@ exports.listarSolicitudes = async (req, res) => {
       searchableFields,
       include: [
         { model: Usuario, as: 'Solicitante', attributes: ['nombre', 'apellido', 'cedula'] },
-        { model: Dependencia, attributes: ['nombre_dependencia', 'codigo'] },
-        { model: Subdependencia, attributes: ['nombre'] },
+        { model: Dependencia, as: 'Dependencia', attributes: ['nombre_dependencia', 'codigo'] },
+        { model: Subdependencia, as: 'Subdependencia', attributes: ['nombre'] },
         { model: TipoCombustible, attributes: ['nombre'] },
         { model: Llenadero, attributes: ['nombre_llenadero'] }
       ],

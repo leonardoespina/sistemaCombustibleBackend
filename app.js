@@ -19,7 +19,7 @@ const server = http.createServer(app);
 // 2. CONFIGURACIÓN DEL SERVIDOR
 // ============================================================
 const whitelist = [
-   
+
   "http://localhost:5173",
   "http://10.60.6.124:5173"
 ];
@@ -49,7 +49,7 @@ const io = new Server(server, {
 // Eventos de conexión de Socket.io
 io.on("connection", (socket) => {
   console.log("Cliente conectado a Socket.io:", socket.id);
-  
+
   socket.on("disconnect", () => {
     console.log("Cliente desconectado de Socket.io:", socket.id);
   });
@@ -89,6 +89,7 @@ app.use("/api/llenaderos", require("./routes/llenaderoRoutes"));
 app.use("/api/tanques", require("./routes/tanqueRoutes"));
 app.use("/api/dispensadores", require("./routes/dispensadorRoutes"));
 app.use("/api/solicitudes", require("./routes/solicitudRoutes"));
+app.use("/api/despacho", require("./routes/despachoRoutes"));
 
 
 // Inicializar Cron Jobs

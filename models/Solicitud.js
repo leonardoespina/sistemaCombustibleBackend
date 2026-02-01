@@ -169,17 +169,17 @@ Solicitud.associate = (models) => {
   Solicitud.belongsTo(models.Usuario, { foreignKey: "id_usuario", as: "Solicitante" });
   Solicitud.belongsTo(models.Usuario, { foreignKey: "id_aprobador", as: "Aprobador" });
   Solicitud.belongsTo(models.Usuario, { foreignKey: "id_almacenista", as: "Almacenista" });
-  
+
   Solicitud.belongsTo(models.Biometria, { foreignKey: "id_receptor", as: "Receptor" });
-  
-  Solicitud.belongsTo(models.Dependencia, { foreignKey: "id_dependencia" });
-  Solicitud.belongsTo(models.Subdependencia, { foreignKey: "id_subdependencia" });
+
+  Solicitud.belongsTo(models.Dependencia, { foreignKey: "id_dependencia", as: "Dependencia" });
+  Solicitud.belongsTo(models.Subdependencia, { foreignKey: "id_subdependencia", as: "Subdependencia" });
   Solicitud.belongsTo(models.Categoria, { foreignKey: "id_categoria" });
-  
+
   Solicitud.belongsTo(models.Vehiculo, { foreignKey: "id_vehiculo" });
   Solicitud.belongsTo(models.Llenadero, { foreignKey: "id_llenadero" });
   Solicitud.belongsTo(models.TipoCombustible, { foreignKey: "id_tipo_combustible" });
-  
+
   // Relación opcional con PrecioCombustible (para ventas)
   Solicitud.belongsTo(models.PrecioCombustible, { foreignKey: "id_precio" });
 };

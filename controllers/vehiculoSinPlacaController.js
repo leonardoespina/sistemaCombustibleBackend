@@ -9,7 +9,7 @@ const { withTransaction } = require("../helpers/transactionHelper");
 async function obtenerOcrearRegistro(transaction = null) {
   const options = transaction ? { transaction } : {};
   let registro = await VehiculoSinPlaca.findByPk(1, options);
-  
+
   if (!registro) {
     registro = await VehiculoSinPlaca.create({
       id: 1,
@@ -17,7 +17,7 @@ async function obtenerOcrearRegistro(transaction = null) {
       prefijo: "SPMB"
     }, options);
   }
-  
+
   return registro;
 }
 
@@ -32,10 +32,13 @@ function generarPlaca(correlativo, prefijo = "SPMB") {
 exports.obtenerUltimoCorrelativo = async (req, res) => {
   try {
     const registro = await obtenerOcrearRegistro();
-    
+
+    const siguiente = registro.ultimo_correlativo + 1;
+
     res.json({
-      correlativo: registro.ultimo_correlativo,
-      placaGenerada: generarPlaca(registro.ultimo_correlativo, registro.prefijo),
+      correlativo: registro.ultimo_correlativo, // Mantenemos el último real
+      siguiente_correlativo: siguiente,         // Enviamos el siguiente explícitamente
+      placaGenerada: generarPlaca(siguiente, registro.prefijo), // Generamos la placa con el SIGUIENTE
       prefijo: registro.prefijo
     });
   } catch (error) {
@@ -49,9 +52,9 @@ exports.generarSiguienteCorrelativo = async (req, res) => {
   try {
     await withTransaction(req, async (t) => {
       const registro = await obtenerOcrearRegistro(t);
-      
+
       const siguienteCorrelativo = registro.ultimo_correlativo + 1;
-      
+
       await registro.update({
         ultimo_correlativo: siguienteCorrelativo,
         fecha_actualizacion: new Date()
@@ -78,13 +81,13 @@ exports.actualizarCorrelativo = async (req, res) => {
   try {
     await withTransaction(req, async (t) => {
       const registro = await obtenerOcrearRegistro(t);
-      
+
       await registro.update({
         ultimo_correlativo: nuevoCorrelativo,
         fecha_actualizacion: new Date()
       }, { transaction: t });
 
-      res.json({ 
+      res.json({
         msg: "Correlativo actualizado exitosamente",
         correlativo: nuevoCorrelativo,
         placaGenerada: generarPlaca(nuevoCorrelativo, registro.prefijo),
@@ -103,7 +106,7 @@ exports.actualizarCorrelativo = async (req, res) => {
 exports.obtenerConfiguracion = async (req, res) => {
   try {
     const registro = await VehiculoSinPlaca.findByPk(1);
-    
+
     if (!registro) {
       res.json({
         existe: false,
