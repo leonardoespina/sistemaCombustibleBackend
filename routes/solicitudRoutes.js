@@ -20,7 +20,10 @@ router.post("/", solicitudController.crearSolicitud);
 // Listar Solicitudes (con filtros)
 router.get("/", solicitudController.listarSolicitudes);
 
-// Aprobar Solicitud (Requiere rol Gerente/Jefe, validado en controlador o aquí)
+// Aprobar Solicitud (Requiere rol Gerente/Jefe)
 router.put("/:id/aprobar", solicitudController.aprobarSolicitud);
+
+// Rechazar (Anular) Solicitud
+router.put("/:id/rechazar", solicitudController.rechazarSolicitud);
 
 module.exports = router;

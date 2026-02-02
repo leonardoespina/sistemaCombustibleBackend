@@ -46,11 +46,19 @@ async function verificarHuella(cedula, muestra) {
  */
 exports.listarSolicitudesParaDespacho = async (req, res) => {
     try {
-        const { page, limit, search, fecha_inicio, fecha_fin, sort } = req.query;
+        const { page, limit, search, fecha_inicio, fecha_fin, sort, estado } = req.query;
 
-        const where = {
-            estado: 'APROBADA'
-        };
+        const where = {};
+
+        // RF: Por defecto solo APROBADA (listas para imprimir)
+        // Pero el almacenista quiere ver también las IMPRESAS (listas para despachar)
+        if (estado === 'TODAS') {
+            where.estado = { [Op.in]: ['APROBADA', 'IMPRESA'] };
+        } else if (estado) {
+            where.estado = estado;
+        } else {
+            where.estado = 'APROBADA';
+        }
 
         if (fecha_inicio && fecha_fin) {
             const startOfDay = moment(fecha_inicio).startOf('day').toDate();
@@ -303,8 +311,8 @@ exports.reimprimirTicket = async (req, res) => {
             ]
         });
 
-        if (!solicitudFull || (solicitudFull.estado !== 'IMPRESA' && solicitudFull.estado !== 'DESPACHADA')) {
-            return res.status(400).json({ msg: "Solo se pueden reimprimir tickets Impresos o Despachados." });
+        if (!solicitudFull || !['IMPRESA', 'DESPACHADA', 'FINALIZADA'].includes(solicitudFull.estado)) {
+            return res.status(400).json({ msg: "Solo se pueden reimprimir tickets Impresos, Despachados o Finalizados." });
         }
 
         await solicitudFull.increment('numero_impresiones');

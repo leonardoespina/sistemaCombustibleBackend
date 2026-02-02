@@ -21,7 +21,7 @@ const server = http.createServer(app);
 const whitelist = [
 
   "http://localhost:5173",
-  "http://10.60.6.124:5173"
+  "http://10.60.7.132:5173"
 ];
 
 const corsOptions = {
@@ -86,10 +86,12 @@ app.use("/api/marcas", require("./routes/marcaRoutes"));
 app.use("/api/vehiculos", require("./routes/vehiculoRoutes"));
 app.use("/api/vehiculos-sin-placa", require("./routes/vehiculoSinPlaca"));
 app.use("/api/llenaderos", require("./routes/llenaderoRoutes"));
+app.use("/api/movimientos-llenadero", require("./routes/movimientoLlenaderoRoutes"));
 app.use("/api/tanques", require("./routes/tanqueRoutes"));
 app.use("/api/dispensadores", require("./routes/dispensadorRoutes"));
 app.use("/api/solicitudes", require("./routes/solicitudRoutes"));
 app.use("/api/despacho", require("./routes/despachoRoutes"));
+app.use("/api/validacion", require("./routes/validacionRoutes"));
 
 
 // Inicializar Cron Jobs

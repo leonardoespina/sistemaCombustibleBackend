@@ -1,4 +1,4 @@
-const { Solicitud, CupoActual, Subdependencia, Llenadero, TipoCombustible, Vehiculo, Usuario, Dependencia, Categoria, CupoBase } = require("../models");
+const { Solicitud, CupoActual, Subdependencia, Llenadero, TipoCombustible, Vehiculo, Usuario, Dependencia, Categoria, CupoBase, PrecioCombustible } = require("../models");
 const { sequelize } = require("../config/database");
 const { paginate } = require("../helpers/paginationHelper");
 const { Op } = require("sequelize");
@@ -22,7 +22,19 @@ exports.crearSolicitud = async (req, res) => {
       id_precio, id_subdependencia, id_dependencia, id_categoria
     } = req.body;
 
-    // 3. Validar Bloqueo de Placa (RF-05)
+    // 2.1 DEBUG: Verificar qué se recibió
+    console.log("DEBUG - Placa recibida:", placa);
+    console.log("DEBUG - Tipo de placa:", typeof placa);
+    console.log("DEBUG - Placa es falsy?:", !placa);
+
+    // 2.2 Validar que la placa existe
+    if (!placa) {
+      await t.rollback();
+      console.error("ERROR: La placa es undefined/null/empty");
+      return res.status(400).json({ msg: "La placa del vehículo es requerida" });
+    }
+
+    // 3. Validar Bloqueo de Placa (RF-05) - Excluir solicitudes VENCIDAS
     const solicitudActiva = await Solicitud.findOne({
       where: {
         placa,
@@ -306,10 +318,73 @@ exports.listarSolicitudes = async (req, res) => {
 
     res.json(result);
   } catch (error) {
-    console.error(error);
+    console.error("Error en listarSolicitudes:", error);
     res.status(500).json({ msg: "Error listando solicitudes" });
   }
 };
+
+/**
+ * Rechazar (Anular) Solicitud
+ * Libera el cupo reintegrándolo al periodo original de la solicitud
+ */
+exports.rechazarSolicitud = async (req, res) => {
+  const { id } = req.params;
+  const { motivo } = req.body;
+
+  const t = await sequelize.transaction();
+  try {
+    const solicitud = await Solicitud.findByPk(id, { transaction: t });
+
+    if (!solicitud) {
+      if (t) await t.rollback();
+      return res.status(404).json({ msg: "Solicitud no encontrada" });
+    }
+
+    if (['DESPACHADA', 'VENCIDA', 'ANULADA'].includes(solicitud.estado)) {
+      if (t) await t.rollback();
+      return res.status(400).json({ msg: `No se puede rechazar una solicitud en estado ${solicitud.estado}` });
+    }
+
+    // 1. Reintegrar Cupo al periodo original
+    const periodoOriginal = moment(solicitud.fecha_solicitud).format("YYYY-MM");
+    const cupo = await CupoActual.findOne({
+      where: {
+        periodo: periodoOriginal,
+        estado: { [Op.ne]: "CERRADO" }
+      },
+      include: [{
+        model: CupoBase,
+        as: "CupoBase",
+        where: {
+          id_subdependencia: solicitud.id_subdependencia,
+          id_tipo_combustible: solicitud.id_tipo_combustible
+        }
+      }],
+      transaction: t
+    });
+
+    if (cupo) {
+      console.log(`Reintegrando ${solicitud.cantidad_litros} litros al cupo ID: ${cupo.id_cupo_actual} (${periodoOriginal}) por rechazo.`);
+      await cupo.increment("cantidad_disponible", { by: solicitud.cantidad_litros, transaction: t });
+      await cupo.decrement("cantidad_consumida", { by: solicitud.cantidad_litros, transaction: t });
+    }
+
+    // 2. Actualizar estado y motivo
+    await solicitud.update({
+      estado: 'ANULADA',
+      observaciones: motivo ? `RECHAZO: ${motivo}` : 'RECHAZO SIN MOTIVO'
+    }, { transaction: t });
+
+    await t.commit();
+    res.json({ msg: "Solicitud rechazada y cupo reintegrado exitosamente" });
+
+  } catch (error) {
+    if (t) await t.rollback();
+    console.error("Error en rechazarSolicitud:", error);
+    res.status(500).json({ msg: "Error al procesar el rechazo" });
+  }
+};
+
 
 exports.obtenerLlenaderosPorCombustible = async (req, res) => {
   try {

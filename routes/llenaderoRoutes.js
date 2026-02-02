@@ -20,6 +20,9 @@ router.post(
   [
     authorizeRole(["ADMIN"]),
     check("nombre_llenadero", "El nombre del llenadero es obligatorio").not().isEmpty(),
+    check("capacidad", "La capacidad debe ser un número positivo").isFloat({ min: 0 }),
+    check("disponibilidadActual", "La disponibilidad debe ser un número positivo").isFloat({ min: 0 }),
+    check("id_combustible", "El tipo de combustible es obligatorio").isInt(),
     validarCampos,
   ],
   llenaderoController.crearLlenadero
@@ -31,6 +34,9 @@ router.put(
   [
     authorizeRole(["ADMIN"]),
     check("nombre_llenadero", "El nombre no puede estar vacío").optional().not().isEmpty(),
+    check("capacidad", "La capacidad debe ser un número positivo").optional().isFloat({ min: 0 }),
+    check("disponibilidadActual", "La disponibilidad debe ser un número positivo").optional().isFloat({ min: 0 }),
+    check("id_combustible", "El tipo de combustible es inválido").optional().isInt(),
     validarCampos,
   ],
   llenaderoController.actualizarLlenadero

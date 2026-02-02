@@ -101,7 +101,8 @@ const Solicitud = sequelize.define(
         "IMPRESA",
         "DESPACHADA",
         "VENCIDA",
-        "ANULADA"
+        "ANULADA",
+        "FINALIZADA"
       ),
       defaultValue: "PENDIENTE",
     },
@@ -130,6 +131,20 @@ const Solicitud = sequelize.define(
     fecha_despacho: {
       type: DataTypes.DATE,
       allowNull: true,
+    },
+    // Validación y Cierre (Nuevo Fase 5)
+    fecha_validacion: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+    observaciones_validacion: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    id_validador: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      comment: "Usuario (Inspector/Gerente) que finalizó el ticket",
     },
     // Biometría (IDs de usuario/biometria que pusieron huella)
     id_almacenista: {
@@ -169,6 +184,7 @@ Solicitud.associate = (models) => {
   Solicitud.belongsTo(models.Usuario, { foreignKey: "id_usuario", as: "Solicitante" });
   Solicitud.belongsTo(models.Usuario, { foreignKey: "id_aprobador", as: "Aprobador" });
   Solicitud.belongsTo(models.Usuario, { foreignKey: "id_almacenista", as: "Almacenista" });
+  Solicitud.belongsTo(models.Usuario, { foreignKey: "id_validador", as: "Validador" });
 
   Solicitud.belongsTo(models.Biometria, { foreignKey: "id_receptor", as: "Receptor" });
 

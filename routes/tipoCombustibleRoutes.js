@@ -17,7 +17,7 @@ router.get(
 // GET /api/tipos-combustible (Listar Paginado - Solo Admin/Supervisor)
 router.get(
     "/",
-    [autenticarUsuario, authorizeRole(["ADMIN"])],
+    [autenticarUsuario],
     tipoCombustibleController.obtenerTiposCombustible
 );
 
