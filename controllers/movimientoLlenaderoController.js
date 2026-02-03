@@ -30,11 +30,10 @@ exports.crearMovimiento = async (req, res) => {
       }
 
       // 1. Buscar y Bloquear Llenadero
-      // Incluimos TipoCombustible para validar reglas de negocio (Evaporación solo Gasolina)
+      // NOTA: No usamos include aquí para evitar error "FOR UPDATE cannot be applied to the nullable side of an outer join"
       const llenadero = await Llenadero.findByPk(id_llenadero, {
         transaction: t,
-        lock: true,
-        include: [{ model: TipoCombustible }] 
+        lock: true
       });
 
       if (!llenadero) {
@@ -68,7 +67,12 @@ exports.crearMovimiento = async (req, res) => {
 
       } else if (tipo_movimiento === "EVAPORACION") {
         // Validación de Regla de Negocio: Solo Gasolina
-        const nombreCombustible = llenadero.TipoCombustible ? llenadero.TipoCombustible.nombre.toUpperCase() : "";
+        // Recuperamos el tipo de combustible en una consulta separada
+        let nombreCombustible = "";
+        if (llenadero.id_combustible) {
+           const tipo = await TipoCombustible.findByPk(llenadero.id_combustible, { transaction: t });
+           if (tipo) nombreCombustible = tipo.nombre.toUpperCase();
+        }
         
         // Verifica si contiene "GASOLINA" (ej: "GASOLINA 91", "GASOLINA 95")
         if (!nombreCombustible.includes("GASOLINA")) {
