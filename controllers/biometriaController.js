@@ -7,8 +7,20 @@ const { withTransaction } = require("../helpers/transactionHelper");
 const { Op } = require("sequelize");
 const axios = require("axios");
 
-// URL del microservicio de verificación biométrica
-const BIOMETRIC_SERVICE_URL = "http://localhost:7000/api/verify";
+// ============================================================================
+// 🔧 CONFIGURACIÓN SIMPLE - COMENTA/DESCOMENTA SEGÚN NECESITES
+// ============================================================================
+
+// 🏠 PARA PRUEBAS LOCALES (descomenta esta línea, comenta la otra)
+ //const BIOMETRIC_SERVICE_URL = "http://localhost:7000";
+
+// 🌐 PARA PRODUCCIÓN/RENDER (descomenta esta línea, comenta la otra)
+const BIOMETRIC_SERVICE_URL = "https://captura-huellas-microservicio.onrender.com";
+
+// ⚠️ IMPORTANTE: Solo una línea debe estar descomentada a la vez
+// ============================================================================
+
+console.log(`✅ Microservicio configurado: ${BIOMETRIC_SERVICE_URL}`);
 
 /**
  * Servicio de Biometría
@@ -25,7 +37,7 @@ exports.registrarBiometria = async (req, res) => {
       let registro = await Biometria.findOne({ where: { cedula }, transaction: t });
       
       const biometricData = JSON.stringify({
-        templates: huellas, // Array de strings Base64 (FMDs)
+        templates: huellas,
         updatedAt: new Date().toISOString()
       });
 
@@ -73,18 +85,36 @@ exports.compararHuellas = async (req, res) => {
   }
 
   try {
-    const response = await axios.post(BIOMETRIC_SERVICE_URL, {
-      probe: muestra1,
-      candidate: muestra2
-    }, {
-      timeout: 10000,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    // ✅ URL completa: base + /api/verify
+    const response = await axios.post(
+      `${BIOMETRIC_SERVICE_URL}/api/verify`,
+      {
+        probe: muestra1,
+        candidate: muestra2
+      }, 
+      {
+        // Timeout diferente según entorno
+        timeout: BIOMETRIC_SERVICE_URL.includes("localhost") ? 10000 : 30000,
+        headers: { 'Content-Type': 'application/json' }
+      }
+    );
 
     res.json(response.data);
   } catch (error) {
-    console.error("Error en comparación directa:", error.message);
-    res.status(500).json({ msg: "Error en el servicio biométrico" });
+    console.error("❌ Error en comparación directa:", error.message);
+    
+    // Mensaje útil según entorno
+    if (BIOMETRIC_SERVICE_URL.includes("localhost")) {
+      console.log("💡 ¿Está corriendo el microservicio Java? (puerto 7000)");
+    } else {
+      console.log("💡 El servicio en Render puede estar en 'cold start' (espere 30-60s)");
+    }
+    
+    res.status(500).json({ 
+      msg: "Error en el servicio biométrico",
+      detalle: error.message,
+      urlUsada: `${BIOMETRIC_SERVICE_URL}/api/verify`
+    });
   }
 };
 
@@ -93,8 +123,9 @@ exports.verificarIdentidad = async (req, res) => {
   const { cedula, muestraActual } = req.body; 
   
   console.log("=== INICIO VERIFICACIÓN BIOMÉTRICA ===");
-  console.log("Cédula buscada:", cedula);
-  console.log("Longitud muestra recibida:", muestraActual?.length);
+  console.log("🔧 Entorno:", BIOMETRIC_SERVICE_URL.includes("localhost") ? "LOCAL" : "RENDER");
+  console.log("🔍 Cédula:", cedula);
+  console.log("📏 Longitud muestra:", muestraActual?.length || 0);
 
   if (!cedula || !muestraActual) {
     return res.status(400).json({ msg: "Cédula y muestra biométrica son requeridas" });
@@ -106,54 +137,77 @@ exports.verificarIdentidad = async (req, res) => {
     });
 
     if (!registro) {
-      console.log("Resultado: Cédula no encontrada en biometría");
+      console.log("❌ Cédula no encontrada");
       return res.status(404).json({ match: false, msg: "Persona no registrada" });
     }
 
     const biometricData = JSON.parse(registro.template);
     
-    // --- LÓGICA DE MATCHING CON MICROSERVICIO JAVA (SOURCEAFIS) ---
-    console.log(`Comparando contra ${biometricData.templates.length} template(s) almacenado(s)`);
+    console.log(`🔢 Comparando contra ${biometricData.templates.length} template(s)`);
     
     const matchPromises = biometricData.templates.map(async (templateGuardado, index) => {
       try {
-        console.log(`Enviando comparación ${index + 1} al microservicio...`);
+        console.log(`📤 Enviando comparación ${index + 1}...`);
         
-        const response = await axios.post(BIOMETRIC_SERVICE_URL, {
-          probe: muestraActual,
-          candidate: templateGuardado
-        }, {
-          timeout: 10000, // 10 segundos de timeout
-          headers: { 'Content-Type': 'application/json' }
-        });
+        const response = await axios.post(
+          `${BIOMETRIC_SERVICE_URL}/api/verify`,
+          {
+            probe: muestraActual,
+            candidate: templateGuardado
+          }, 
+          {
+            // Timeout ajustado según entorno
+            timeout: BIOMETRIC_SERVICE_URL.includes("localhost") ? 10000 : 30000,
+            headers: { 'Content-Type': 'application/json' }
+          }
+        );
 
         const { match, score } = response.data;
-        console.log(`Template ${index + 1} - Score: ${score}, Match: ${match}`);
+        console.log(`✅ Template ${index + 1} - Score: ${score}, Match: ${match}`);
         return score;
       } catch (error) {
-        console.error(`Error al comparar template ${index + 1}:`, error.message);
-        if (error.code === 'ECONNREFUSED') {
-          throw new Error('Microservicio biométrico no disponible. Verifica que esté corriendo en puerto 7000.');
+        console.error(`❌ Error template ${index + 1}:`, error.message);
+        
+        // Diagnóstico específico
+        if (error.code === 'ECONNREFUSED' && BIOMETRIC_SERVICE_URL.includes("localhost")) {
+          console.log("🔥 MICROSERVICIO LOCAL NO DISPONIBLE");
+          console.log("   Ejecuta: java -jar target\\biometric-service-1.0-SNAPSHOT.jar");
         }
-        return 0; // Si falla la comparación, retorna 0
+        
+        return 0;
       }
     });
 
     const scores = await Promise.all(matchPromises);
     const mejorScore = Math.max(...scores);
-    const umbral = 40; // Umbral estándar de SourceAFIS para alta confianza
+    const umbral = 40;
+
+    console.log(`🎯 Mejor score: ${mejorScore} (umbral: ${umbral})`);
 
     if (mejorScore >= umbral) {
-      console.log(`MATCH ENCONTRADO! Score: ${mejorScore}`);
-      res.json({ match: true, score: mejorScore, persona: registro });
+      console.log(`✅ MATCH ENCONTRADO!`);
+      res.json({ 
+        match: true, 
+        score: mejorScore, 
+        persona: registro,
+        entorno: BIOMETRIC_SERVICE_URL.includes("localhost") ? "LOCAL" : "RENDER"
+      });
     } else {
-      console.log("NO SE ENCONTRÓ COINCIDENCIA");
-      res.status(200).json({ match: false, msg: "La huella no coincide" });
+      console.log("❌ NO HAY COINCIDENCIA");
+      res.status(200).json({ 
+        match: false, 
+        msg: "La huella no coincide",
+        score: mejorScore,
+        entorno: BIOMETRIC_SERVICE_URL.includes("localhost") ? "LOCAL" : "RENDER"
+      });
     }
 
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ msg: "Error durante la verificación biométrica" });
+    console.error("💥 Error general:", error);
+    res.status(500).json({ 
+      msg: "Error durante la verificación biométrica",
+      detalle: error.message
+    });
   }
 };
 
@@ -194,5 +248,35 @@ exports.eliminarRegistro = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ msg: "Error al desactivar registro" });
+  }
+};
+
+// --- FUNCIÓN PARA VERIFICAR CONEXIÓN (ÚTIL PARA DEBUG) ---
+exports.verificarConexionMicroservicio = async (req, res) => {
+  try {
+    const healthCheck = await axios.get(
+      BIOMETRIC_SERVICE_URL.includes("localhost") 
+        ? "http://localhost:7000/health" 
+        : "https://captura-huellas-microservicio.onrender.com/health",
+      { timeout: 5000 }
+    );
+    
+    res.json({
+      conectado: healthCheck.data === "OK",
+      entorno: BIOMETRIC_SERVICE_URL.includes("localhost") ? "LOCAL" : "RENDER",
+      urlBase: BIOMETRIC_SERVICE_URL,
+      healthCheck: healthCheck.data,
+      mensaje: "✅ Microservicio disponible"
+    });
+  } catch (error) {
+    res.status(503).json({
+      conectado: false,
+      entorno: BIOMETRIC_SERVICE_URL.includes("localhost") ? "LOCAL" : "RENDER",
+      urlBase: BIOMETRIC_SERVICE_URL,
+      error: error.message,
+      mensaje: BIOMETRIC_SERVICE_URL.includes("localhost") 
+        ? "❌ Microservicio local no responde. Ejecuta: java -jar target\\biometric-service-1.0-SNAPSHOT.jar"
+        : "❌ Microservicio en Render no disponible. Puede estar en 'cold start'."
+    });
   }
 };

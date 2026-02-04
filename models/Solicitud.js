@@ -77,7 +77,7 @@ const Solicitud = sequelize.define(
     tipo_solicitud: {
       type: DataTypes.ENUM("INSTITUCIONAL", "VENTA"),
       allowNull: false,
-      defaultValue: "INSTITUCIONAL",
+      // defaultValue: "INSTITUCIONAL",
     },
     // Datos para Venta
     id_precio: {
@@ -104,7 +104,7 @@ const Solicitud = sequelize.define(
         "ANULADA",
         "FINALIZADA"
       ),
-      defaultValue: "PENDIENTE",
+      // defaultValue: "PENDIENTE",
     },
     // Auditoría y Fechas
     fecha_solicitud: {

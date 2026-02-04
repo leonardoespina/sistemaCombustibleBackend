@@ -11,7 +11,7 @@ exports.registrarEvaporacion = async (req, res) => {
   try {
     const result = await withTransaction(req, async (t) => {
       const { id_usuario } = req.usuario;
-      const { id_llenadero, cantidad, observacion } = req.body;
+      const { id_llenadero, cantidad, observacion, fecha_movimiento } = req.body;
 
       const cantidadDecimal = parseFloat(cantidad);
       if (isNaN(cantidadDecimal) || cantidadDecimal <= 0) {
@@ -44,6 +44,7 @@ exports.registrarEvaporacion = async (req, res) => {
       }
 
       const saldo_anterior = parseFloat(llenadero.disponibilidadActual);
+      const capacidad = parseFloat(llenadero.capacidad || 0);
 
       if (saldo_anterior < cantidadDecimal) {
         throw { status: 400, msg: `No hay suficiente disponibilidad para registrar esa evaporación. Disponible: ${saldo_anterior}` };
@@ -54,7 +55,11 @@ exports.registrarEvaporacion = async (req, res) => {
       // 3. Actualizar Llenadero
       await llenadero.update({ disponibilidadActual: saldo_nuevo }, { transaction: t });
 
-      // 4. Crear Registro Histórico
+      // 4. Calcular Porcentajes para el histórico
+      const porcentaje_anterior = capacidad > 0 ? (saldo_anterior / capacidad) * 100 : 0;
+      const porcentaje_nuevo = capacidad > 0 ? (saldo_nuevo / capacidad) * 100 : 0;
+
+      // 5. Crear Registro Histórico
       const nuevoMovimiento = await MovimientoLlenadero.create({
         id_llenadero,
         id_usuario,
@@ -62,8 +67,10 @@ exports.registrarEvaporacion = async (req, res) => {
         cantidad: cantidadDecimal,
         saldo_anterior,
         saldo_nuevo,
+        porcentaje_anterior,
+        porcentaje_nuevo,
         observacion,
-        fecha_movimiento: new Date()
+        fecha_movimiento: fecha_movimiento || new Date()
       }, { transaction: t });
 
       return { nuevoMovimiento, saldo_nuevo };

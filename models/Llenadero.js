@@ -39,7 +39,8 @@ const Llenadero = sequelize.define(
       }
     },
     estado: {
-      type: DataTypes.ENUM("ACTIVO", "INACTIVO"),
+      // Cambiado de ENUM a STRING para compatibilidad con PostgreSQL sync
+      type: DataTypes.STRING(20),
       defaultValue: "ACTIVO",
     },
   

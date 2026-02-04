@@ -36,6 +36,14 @@ const MovimientoLlenadero = sequelize.define(
       type: DataTypes.DECIMAL(10, 2),
       allowNull: false,
     },
+    porcentaje_anterior: {
+      type: DataTypes.DECIMAL(5, 2),
+      allowNull: true,
+    },
+    porcentaje_nuevo: {
+      type: DataTypes.DECIMAL(5, 2),
+      allowNull: true,
+    },
     fecha_movimiento: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,

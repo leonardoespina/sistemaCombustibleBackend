@@ -16,6 +16,7 @@ exports.crearMovimiento = async (req, res) => {
         tipo_movimiento,
         cantidad,
         observacion,
+        fecha_movimiento,
         // Campos opcionales (Carga)
         numero_factura,
         datos_gandola,
@@ -45,6 +46,7 @@ exports.crearMovimiento = async (req, res) => {
       }
 
       const saldo_anterior = parseFloat(llenadero.disponibilidadActual);
+      const capacidad = parseFloat(llenadero.capacidad || 0);
       let saldo_nuevo = 0;
 
       // 2. Validaciones y Cálculos según Tipo
@@ -94,7 +96,11 @@ exports.crearMovimiento = async (req, res) => {
       // 3. Actualizar Llenadero
       await llenadero.update({ disponibilidadActual: saldo_nuevo }, { transaction: t });
 
-      // 4. Crear Registro Histórico
+      // 4. Calcular Porcentajes para el histórico
+      const porcentaje_anterior = capacidad > 0 ? (saldo_anterior / capacidad) * 100 : 0;
+      const porcentaje_nuevo = capacidad > 0 ? (saldo_nuevo / capacidad) * 100 : 0;
+
+      // 5. Crear Registro Histórico
       const nuevoMovimiento = await MovimientoLlenadero.create({
         id_llenadero,
         id_usuario,
@@ -102,12 +108,14 @@ exports.crearMovimiento = async (req, res) => {
         cantidad: cantidadDecimal,
         saldo_anterior,
         saldo_nuevo,
+        porcentaje_anterior,
+        porcentaje_nuevo,
         observacion,
         numero_factura: tipo_movimiento === 'CARGA' ? numero_factura : null,
         datos_gandola: tipo_movimiento === 'CARGA' ? datos_gandola : null,
         nombre_conductor: tipo_movimiento === 'CARGA' ? nombre_conductor : null,
         cedula_conductor: tipo_movimiento === 'CARGA' ? cedula_conductor : null,
-        fecha_movimiento: new Date()
+        fecha_movimiento: fecha_movimiento || new Date()
       }, { transaction: t });
 
       // Devolver datos relevantes para la respuesta
