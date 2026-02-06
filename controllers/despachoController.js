@@ -6,37 +6,64 @@ const axios = require("axios");
 const moment = require("moment");
 
 // URL del microservicio de verificación biométrica
-const BIOMETRIC_SERVICE_URL = "http://localhost:7000/api/verify";
+// 🏠 PARA PRUEBAS LOCALES
+// const BIOMETRIC_SERVICE_URL = "http://localhost:7000";
+
+// 🌐 PARA PRODUCCIÓN/RENDER
+const BIOMETRIC_SERVICE_URL = "https://captura-huellas-microservicio.onrender.com";
 
 /**
  * Helper para validar huella contra una cédula/usuario
+ * Lógica adaptada de biometriaController.js
  */
 async function verificarHuella(cedula, muestra) {
     if (!cedula || !muestra) return false;
 
     try {
         const registro = await Biometria.findOne({ where: { cedula, estado: "ACTIVO" } });
-        if (!registro) return false;
+        if (!registro) {
+            console.log("❌ Cédula no encontrada en Biometria");
+            return false;
+        }
 
         const biometricData = JSON.parse(registro.template);
-
-        // Comparar contra todos los templates guardados
-        for (const templateGuardado of biometricData.templates) {
+        
+        // Ejecutar comparaciones en paralelo para mejor rendimiento
+        const matchPromises = biometricData.templates.map(async (templateGuardado, index) => {
             try {
-                const response = await axios.post(BIOMETRIC_SERVICE_URL, {
-                    probe: muestra,
-                    candidate: templateGuardado
-                }, { timeout: 5000 });
+                const response = await axios.post(
+                    `${BIOMETRIC_SERVICE_URL}/api/verify`,
+                    {
+                        probe: muestra,
+                        candidate: templateGuardado
+                    }, 
+                    {
+                        timeout: BIOMETRIC_SERVICE_URL.includes("localhost") ? 10000 : 30000,
+                        headers: { 'Content-Type': 'application/json' }
+                    }
+                );
 
-                if (response.data.match && response.data.score >= 40) {
-                    return { match: true, id_biometria: registro.id_biometria, registro };
-                }
-            } catch (err) {
-                console.error("Error comparando template:", err.message);
+                const { match, score } = response.data;
+                // console.log(`Template ${index + 1}: Match=${match}, Score=${score}`);
+                return score;
+            } catch (error) {
+                console.error(`Error verificando template ${index + 1}:`, error.message);
+                return 0;
             }
+        });
+
+        const scores = await Promise.all(matchPromises);
+        const mejorScore = Math.max(...scores);
+        const umbral = 40;
+
+        console.log(`🔍 Verificación Cédula ${cedula}: Mejor Score: ${mejorScore}`);
+
+        if (mejorScore >= umbral) {
+            return { match: true, id_biometria: registro.id_biometria, registro, score: mejorScore };
         }
+
     } catch (error) {
-        console.error("Error en servicio biométrico:", error.message);
+        console.error("Error general en servicio biométrico:", error.message);
     }
     return false;
 }

@@ -231,3 +231,48 @@ exports.desactivarUsuario = async (req, res) => {
     }
   }
 };
+
+// --- OBTENER LISTA DE ALMACENISTAS ---
+exports.obtenerListaAlmacenistas = async (req, res) => {
+  try {
+    const usuarios = await Usuario.findAll({
+      where: { estado: 'ACTIVO', tipo_usuario: 'ALMACENISTA' },
+      attributes: ['id_usuario', 'nombre', 'apellido', 'cedula'],
+      order: [['nombre', 'ASC']]
+    });
+    // Renombrar id_usuario a id_almacenista para compatibilidad con el front si es necesario, 
+    // pero mejor mantener consistencia
+    const result = usuarios.map(u => ({
+        id_almacenista: u.id_usuario,
+        id_usuario: u.id_usuario,
+        nombre: u.nombre,
+        apellido: u.apellido,
+        cedula: u.cedula
+    }));
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ msg: "Error al obtener almacenistas" });
+  }
+};
+
+// --- OBTENER LISTA DE CHOFERES (USUARIOS O PERSONAL) ---
+exports.obtenerListaChoferes = async (req, res) => {
+  try {
+    // Por ahora sacamos de Usuarios, podrías filtrar por un rol específico si existe
+    const usuarios = await Usuario.findAll({
+      where: { estado: 'ACTIVO' },
+      attributes: ['id_usuario', 'nombre', 'apellido', 'cedula'],
+      order: [['nombre', 'ASC']]
+    });
+    const result = usuarios.map(u => ({
+        id_chofer: u.id_usuario,
+        id_usuario: u.id_usuario,
+        nombre: u.nombre,
+        apellido: u.apellido,
+        cedula: u.cedula
+    }));
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ msg: "Error al obtener choferes" });
+  }
+};

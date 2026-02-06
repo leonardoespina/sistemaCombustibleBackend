@@ -14,6 +14,9 @@ router.get("/", authorizeRole(["ADMIN"]), tanqueController.obtenerTanques);
 // GET /api/tanques/lista - Para selectores (Todos los autenticados)
 router.get("/lista", tanqueController.obtenerListaTanques);
 
+// GET /api/tanques/:id - Obtener detalle
+router.get("/:id", tanqueController.obtenerTanquePorId);
+
 // POST /api/tanques - Crear (Solo ADMIN)
 router.post(
   "/",

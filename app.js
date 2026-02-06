@@ -21,7 +21,7 @@ const server = http.createServer(app);
 const whitelist = [
 
   "http://localhost:5173",
-  "http://10.60.7.132:5173"
+  "http://10.60.0.90:5173"
 ];
 
 const corsOptions = {
@@ -55,8 +55,18 @@ io.on("connection", (socket) => {
   });
 });
 
-// Conexión BD
 dbConnect();
+
+// Conexión BD e Sincronización
+/*dbConnect().then(async () => {
+  try {
+    // Sincronizar todos los modelos (crea tablas si no existen)
+    await db.sequelize.sync({ alter: true });
+    console.log("✅ Modelos sincronizados con la Base de Datos");
+  } catch (error) {
+    console.error("❌ Error al sincronizar modelos:", error);
+  }
+});*/
 
 // Middlewares
 app.use(cors(corsOptions));
@@ -89,11 +99,16 @@ app.use("/api/llenaderos", require("./routes/llenaderoRoutes"));
 app.use("/api/movimientos-llenadero", require("./routes/movimientoLlenaderoRoutes"));
 app.use("/api/evaporaciones", require("./routes/evaporacionRoutes"));
 app.use("/api/tanques", require("./routes/tanqueRoutes"));
- 
+
 app.use("/api/dispensadores", require("./routes/dispensadorRoutes"));
 app.use("/api/solicitudes", require("./routes/solicitudRoutes"));
 app.use("/api/despacho", require("./routes/despachoRoutes"));
 app.use("/api/validacion", require("./routes/validacionRoutes"));
+app.use("/api/mediciones", require("./routes/medicionRoutes"));
+app.use("/api/cargas-cisterna", require("./routes/cargaCisternaRoutes"));
+app.use("/api/transferencias-internas", require("./routes/transferenciaRoutes"));
+app.use("/api/dashboard", require("./routes/dashboardRoutes"));
+app.use("/api/reportes", require("./routes/reporteRoutes"));
 
 
 // Inicializar Cron Jobs

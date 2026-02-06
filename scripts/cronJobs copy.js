@@ -92,6 +92,24 @@ const initCronJobs = (io) => {
   }, {
     timezone: "America/Caracas" // Zona horaria de Venezuela (UTC-4)
   });
+>>>>>>>------- SEARCH
+  console.log("✅ Tareas programadas (Cron Jobs) iniciadas.");
+  console.log("📅 Cron de cierre diario: Todos los días a las 23:59 (America/Caracas)");
+  console.log("📅 Cron de reinicio mensual: Día 1 de cada mes a las 00:05 (America/Caracas)");
+};
+  console.log("✅ Tareas programadas (Cron Jobs) iniciadas.");
+  console.log("📅 Cron de cierre diario: Todos los días a las 23:59 (America/Caracas)");
+  console.log("📅 Cron de reinicio mensual: Día 1 de cada mes a las 00:05 (America/Caracas)");
+
+  // === RUTINA DE INICIO: RECUPERACIÓN DE VENCIMIENTOS ===
+  // Al arrancar, verificamos si quedaron solicitudes pendientes de días ANTERIORES (ayer hacia atrás).
+  // No tocamos las de "hoy" porque el día no ha terminado.
+  const finDiaAyer = moment().subtract(1, 'days').endOf('day').toDate();
+  console.log("🔄 Ejecutando rutina de verificación de tickets vencidos (Recuperación)...");
+  procesarCierreSolicitudes(io, finDiaAyer, "INICIO-RECUPERACION");
+};
+>>>>+++ REPLACE
+
 
   // ============================================================
   // CRON JOB 2: REINICIO MENSUAL DE CUPOS
@@ -118,13 +136,6 @@ const initCronJobs = (io) => {
   console.log("✅ Tareas programadas (Cron Jobs) iniciadas.");
   console.log("📅 Cron de cierre diario: Todos los días a las 23:59 (America/Caracas)");
   console.log("📅 Cron de reinicio mensual: Día 1 de cada mes a las 00:05 (America/Caracas)");
-
-  // === RUTINA DE INICIO: RECUPERACIÓN DE VENCIMIENTOS ===
-  // Al arrancar, verificamos si quedaron solicitudes pendientes de días ANTERIORES (ayer hacia atrás).
-  // No tocamos las de "hoy" porque el día no ha terminado.
-  const finDiaAyer = moment().subtract(1, 'days').endOf('day').toDate();
-  console.log("🔄 Ejecutando rutina de verificación de tickets vencidos (Recuperación)...");
-  procesarCierreSolicitudes(io, finDiaAyer, "INICIO-RECUPERACION");
 };
 
 module.exports = initCronJobs;

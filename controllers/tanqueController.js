@@ -145,6 +145,28 @@ exports.actualizarTanque = async (req, res) => {
   }
 };
 
+// --- OBTENER UN SOLO TANQUE ---
+exports.obtenerTanquePorId = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const tanque = await Tanque.findByPk(id, {
+      include: [
+        { model: Llenadero, as: "Llenadero", attributes: ["nombre_llenadero"] },
+        { model: TipoCombustible, as: "TipoCombustible", attributes: ["nombre"] },
+      ],
+    });
+
+    if (!tanque) {
+      return res.status(404).json({ msg: "Tanque no encontrado" });
+    }
+
+    res.json(tanque);
+  } catch (error) {
+    console.error("Error al obtener detalle de tanque:", error);
+    res.status(500).json({ msg: "Error al obtener el detalle del tanque" });
+  }
+};
+
 // --- DESACTIVAR / CAMBIAR ESTADO (Soft Delete) ---
 exports.eliminarTanque = async (req, res) => {
   const { id } = req.params;
@@ -174,7 +196,16 @@ exports.obtenerListaTanques = async (req, res) => {
 
     const tanques = await Tanque.findAll({
       where,
-      attributes: ["id_tanque", "codigo", "nombre", "capacidad_maxima", "nivel_actual", "tipo_tanque", "con_aforo"],
+      attributes: [
+        "id_tanque",
+        "codigo",
+        "nombre",
+        "capacidad_maxima",
+        "nivel_actual",
+        "tipo_tanque",
+        "con_aforo",
+        "id_tipo_combustible", // REQUERIDO PARA FILTRADO EN FRONT
+      ],
       include: [
         { model: TipoCombustible, as: "TipoCombustible", attributes: ["nombre"] },
       ],
