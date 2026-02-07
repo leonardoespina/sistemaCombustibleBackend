@@ -170,18 +170,16 @@ exports.finalizarTicket = async (req, res) => {
                 }
             }
 
-            // Actualizar la cantidad despachada en la solicitud para reflejar la realidad
-            await solicitud.update({
-                cantidad_despachada: cantidadReal
-            }, { transaction: t });
         }
 
         // FINALIZAR TICKET
+        // Actualizar la cantidad despachada siempre, haya excedente o no.
         await solicitud.update({
             estado: 'FINALIZADA',
             fecha_validacion: new Date(),
             id_validador: id_validador,
-            observaciones_validacion: observaciones
+            observaciones_validacion: observaciones,
+            cantidad_despachada: cantidadReal
         }, { transaction: t });
 
         await t.commit();

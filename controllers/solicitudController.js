@@ -127,8 +127,9 @@ exports.crearSolicitud = async (req, res) => {
       if (id_precio) {
         const precioObj = await PrecioCombustible.findByPk(id_precio);
         if (precioObj) {
-          precio_unitario = precioObj.precio;
-          monto_total = parseFloat(cantidad_litros) * parseFloat(precio_unitario);
+          precio_unitario = parseFloat(precioObj.precio);
+          // Asegurar cálculo con precisión decimal
+          monto_total = (parseFloat(cantidad_litros) * precio_unitario).toFixed(4); // Ajustado a 4 decimales según modelo
         }
       } else {
         await t.rollback();
@@ -153,7 +154,7 @@ exports.crearSolicitud = async (req, res) => {
       placa, marca, modelo, flota,
       id_llenadero,
       id_tipo_combustible,
-      cantidad_litros,
+      cantidad_litros: parseFloat(cantidad_litros), // Asegurar que sea número
       cantidad_despachada: null,
       tipo_suministro,
       tipo_solicitud,

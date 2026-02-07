@@ -26,7 +26,7 @@ const PrecioCombustible = sequelize.define(
       },
     },
     precio: {
-      type: DataTypes.DECIMAL(20, 4), // Alta precisión para valores como Oro (0.025)
+      type: DataTypes.DECIMAL(8, 4), // Alta precisión para valores como Oro (0.025)
       allowNull: false,
     },
     fecha_vigencia: {

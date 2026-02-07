@@ -7,10 +7,10 @@ const moment = require("moment");
 
 // URL del microservicio de verificación biométrica
 // 🏠 PARA PRUEBAS LOCALES
-// const BIOMETRIC_SERVICE_URL = "http://localhost:7000";
+ const BIOMETRIC_SERVICE_URL = "http://localhost:7000";
 
 // 🌐 PARA PRODUCCIÓN/RENDER
-const BIOMETRIC_SERVICE_URL = "https://captura-huellas-microservicio.onrender.com";
+//const BIOMETRIC_SERVICE_URL = "https://captura-huellas-microservicio.onrender.com";
 
 /**
  * Helper para validar huella contra una cédula/usuario

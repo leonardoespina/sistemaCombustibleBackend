@@ -55,18 +55,27 @@ io.on("connection", (socket) => {
   });
 });
 
-dbConnect();
-
 // Conexión BD e Sincronización
-/*dbConnect().then(async () => {
+dbConnect().then(async () => {
   try {
     // Sincronizar todos los modelos (crea tablas si no existen)
     await db.sequelize.sync({ alter: true });
     console.log("✅ Modelos sincronizados con la Base de Datos");
+
+    // Inicializar Cron Jobs DESPUÉS de sincronizar la BD
+    const initCronJobs = require("./scripts/cronJobs");
+    initCronJobs(io);
+
+    // Arranque del Servidor
+    const PORT = process.env.PORT || 3000;
+    server.listen(PORT, () => {
+      console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
+    });
+
   } catch (error) {
-    console.error("❌ Error al sincronizar modelos:", error);
+    console.error("❌ Error al iniciar la aplicación:", error);
   }
-});*/
+});
 
 // Middlewares
 app.use(cors(corsOptions));
@@ -111,12 +120,4 @@ app.use("/api/dashboard", require("./routes/dashboardRoutes"));
 app.use("/api/reportes", require("./routes/reporteRoutes"));
 
 
-// Inicializar Cron Jobs
-const initCronJobs = require("./scripts/cronJobs");
-initCronJobs(io);
-
-// Arranque
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
-});
+// (Inicialización movida dentro de la conexión a BD)

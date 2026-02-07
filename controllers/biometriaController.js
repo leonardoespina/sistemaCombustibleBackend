@@ -12,10 +12,10 @@ const axios = require("axios");
 // ============================================================================
 
 // 🏠 PARA PRUEBAS LOCALES (descomenta esta línea, comenta la otra)
- //const BIOMETRIC_SERVICE_URL = "http://localhost:7000";
+ const BIOMETRIC_SERVICE_URL = "http://localhost:7000";
 
 // 🌐 PARA PRODUCCIÓN/RENDER (descomenta esta línea, comenta la otra)
-const BIOMETRIC_SERVICE_URL = "https://captura-huellas-microservicio.onrender.com";
+//const BIOMETRIC_SERVICE_URL = "https://captura-huellas-microservicio.onrender.com";
 
 // ⚠️ IMPORTANTE: Solo una línea debe estar descomentada a la vez
 // ============================================================================

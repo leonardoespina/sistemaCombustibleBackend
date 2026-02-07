@@ -86,11 +86,11 @@ const Solicitud = sequelize.define(
       comment: "FK a PrecioCombustible usado para el cálculo",
     },
     precio_unitario: {
-      type: DataTypes.DECIMAL(20, 8),
+      type: DataTypes.DECIMAL(8, 4),
       allowNull: true,
     },
     monto_total: {
-      type: DataTypes.DECIMAL(20, 8),
+      type: DataTypes.DECIMAL(8, 4),
       allowNull: true,
     },
     estado: {
