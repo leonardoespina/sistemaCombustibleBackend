@@ -27,31 +27,66 @@ console.log(`✅ Microservicio configurado: ${BIOMETRIC_SERVICE_URL}`);
  * Maneja el registro y la verificación (matching) de huellas dactilares.
  */
 
-// --- REGISTRAR BIOMETRÍA ---
+// --- REGISTRAR BIOMETRÍA (CREAR O ACTUALIZAR) ---
 exports.registrarBiometria = async (req, res) => {
-  const { cedula, nombre, rol, id_categoria, id_dependencia, id_subdependencia, huellas } = req.body;
+  const { id_biometria, cedula, nombre, rol, id_categoria, id_dependencia, id_subdependencia, huellas } = req.body;
 
   try {
     await withTransaction(req, async (t) => {
-      // 1. Verificar si ya existe el registro
-      let registro = await Biometria.findOne({ where: { cedula }, transaction: t });
-      
-      const biometricData = JSON.stringify({
-        templates: huellas,
-        updatedAt: new Date().toISOString()
-      });
+      let registro;
 
-      if (registro) {
-        await registro.update({
-          nombre,
-          rol,
-          id_categoria,
-          id_dependencia,
-          id_subdependencia,
-          template: biometricData,
-          fecha_modificacion: new Date()
-        }, { transaction: t });
+      // CASO 1: ACTUALIZACIÓN (Si viene ID)
+      if (id_biometria) {
+        registro = await Biometria.findByPk(id_biometria, { transaction: t });
+        if (!registro) {
+          return res.status(404).json({ msg: "Registro biométrico no encontrado para actualizar" });
+        }
+
+        // Validar si cambió la cédula y si la nueva ya existe en otro registro
+        if (cedula && cedula !== registro.cedula) {
+          const cedulaExiste = await Biometria.findOne({ 
+            where: { cedula, id_biometria: { [Op.ne]: id_biometria } }, 
+            transaction: t 
+          });
+          if (cedulaExiste) {
+            return res.status(400).json({ msg: `La cédula ${cedula} ya está registrada por otra persona.` });
+          }
+        }
+
+        // Actualizar datos básicos
+        const updateData = {
+          cedula, nombre, rol, id_categoria, id_dependencia, id_subdependencia, fecha_modificacion: new Date()
+        };
+
+        // Actualizar huellas SOLO si se enviaron nuevas
+        if (huellas && huellas.length > 0) {
+          updateData.template = JSON.stringify({
+            templates: huellas,
+            updatedAt: new Date().toISOString()
+          });
+        }
+
+        await registro.update(updateData, { transaction: t });
+      
       } else {
+        // CASO 2: CREACIÓN (Nuevo Registro)
+        
+        // Validación de Duplicados
+        const existe = await Biometria.findOne({ where: { cedula }, transaction: t });
+        if (existe) {
+          return res.status(400).json({ msg: `La cédula ${cedula} ya posee un registro biométrico activo o inactivo.` });
+        }
+
+        // Validar que vengan huellas para un registro nuevo
+        if (!huellas || huellas.length === 0) {
+          return res.status(400).json({ msg: "Se requieren muestras de huellas para un nuevo registro." });
+        }
+
+        const biometricData = JSON.stringify({
+          templates: huellas,
+          updatedAt: new Date().toISOString()
+        });
+
         registro = await Biometria.create({
           cedula,
           nombre,
@@ -66,12 +101,12 @@ exports.registrarBiometria = async (req, res) => {
       req.io.emit("biometria:actualizado", registro);
 
       res.status(201).json({
-        msg: "Identidad biométrica sincronizada correctamente",
+        msg: id_biometria ? "Registro actualizado correctamente" : "Identidad biométrica registrada correctamente",
         registro
       });
     });
   } catch (error) {
-    console.error(error);
+    console.error("Error en registrarBiometria:", error);
     res.status(500).json({ msg: "Error al procesar registro biométrico" });
   }
 };

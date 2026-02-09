@@ -19,6 +19,7 @@ exports.crearMovimiento = async (req, res) => {
         fecha_movimiento,
         // Campos opcionales (Carga)
         numero_factura,
+        litros_factura,
         datos_gandola,
         nombre_conductor,
         cedula_conductor
@@ -54,16 +55,16 @@ exports.crearMovimiento = async (req, res) => {
         if (llenadero.capacidad) {
           const capacidad = parseFloat(llenadero.capacidad);
           if (saldo_anterior + cantidadDecimal > capacidad) {
-             throw { status: 400, msg: `La carga excede la capacidad del tanque. Capacidad: ${capacidad}, Actual: ${saldo_anterior}, Intento: ${cantidadDecimal}` };
+            throw { status: 400, msg: `La carga excede la capacidad del tanque. Capacidad: ${capacidad}, Actual: ${saldo_anterior}, Intento: ${cantidadDecimal}` };
           }
         }
         saldo_nuevo = saldo_anterior + cantidadDecimal;
 
         // Validar datos obligatorios para Carga (Todos los campos son requeridos)
         if (!numero_factura || !datos_gandola || !nombre_conductor || !cedula_conductor) {
-          throw { 
-            status: 400, 
-            msg: "Todos los datos son obligatorios para la Carga: Factura, Placa, Nombre y Cédula del Conductor." 
+          throw {
+            status: 400,
+            msg: "Todos los datos son obligatorios para la Carga: Factura, Placa, Nombre y Cédula del Conductor."
           };
         }
 
@@ -72,15 +73,15 @@ exports.crearMovimiento = async (req, res) => {
         // Recuperamos el tipo de combustible en una consulta separada
         let nombreCombustible = "";
         if (llenadero.id_combustible) {
-           const tipo = await TipoCombustible.findByPk(llenadero.id_combustible, { transaction: t });
-           if (tipo) nombreCombustible = tipo.nombre.toUpperCase();
+          const tipo = await TipoCombustible.findByPk(llenadero.id_combustible, { transaction: t });
+          if (tipo) nombreCombustible = tipo.nombre.toUpperCase();
         }
-        
+
         // Verifica si contiene "GASOLINA" (ej: "GASOLINA 91", "GASOLINA 95")
         if (!nombreCombustible.includes("GASOLINA")) {
-          throw { 
-            status: 400, 
-            msg: `La evaporación solo aplica para GASOLINA. Este llenadero contiene: ${nombreCombustible || 'Desconocido'}` 
+          throw {
+            status: 400,
+            msg: `La evaporación solo aplica para GASOLINA. Este llenadero contiene: ${nombreCombustible || 'Desconocido'}`
           };
         }
 
@@ -112,6 +113,7 @@ exports.crearMovimiento = async (req, res) => {
         porcentaje_nuevo,
         observacion,
         numero_factura: tipo_movimiento === 'CARGA' ? numero_factura : null,
+        litros_factura: tipo_movimiento === 'CARGA' ? litros_factura : null,
         datos_gandola: tipo_movimiento === 'CARGA' ? datos_gandola : null,
         nombre_conductor: tipo_movimiento === 'CARGA' ? nombre_conductor : null,
         cedula_conductor: tipo_movimiento === 'CARGA' ? cedula_conductor : null,
@@ -124,9 +126,9 @@ exports.crearMovimiento = async (req, res) => {
 
     // Éxito
     if (req.io) {
-      req.io.emit("llenadero:actualizado", { 
-        id_llenadero: req.body.id_llenadero, 
-        disponibilidadActual: result.saldo_nuevo 
+      req.io.emit("llenadero:actualizado", {
+        id_llenadero: req.body.id_llenadero,
+        disponibilidadActual: result.saldo_nuevo
       });
     }
 
@@ -153,12 +155,12 @@ exports.listarMovimientos = async (req, res) => {
 
     if (id_llenadero) where.id_llenadero = id_llenadero;
     if (tipo_movimiento) where.tipo_movimiento = tipo_movimiento;
-    
+
     if (fecha_inicio && fecha_fin) {
-        const start = new Date(fecha_inicio);
-        const end = new Date(fecha_fin);
-        end.setHours(23, 59, 59, 999);
-        where.fecha_movimiento = { [Op.between]: [start, end] };
+      const start = new Date(fecha_inicio);
+      const end = new Date(fecha_fin);
+      end.setHours(23, 59, 59, 999);
+      where.fecha_movimiento = { [Op.between]: [start, end] };
     }
 
     const searchableFields = ["numero_factura", "observacion", "datos_gandola"];

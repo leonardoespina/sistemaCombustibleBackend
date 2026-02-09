@@ -29,9 +29,10 @@ async function paginate(model, reqQuery, options = {}) {
     // 3. Añadir lógica de búsqueda si se proporciona un término y campos de búsqueda
     if (search && options.searchableFields && options.searchableFields.length > 0) {
         // Crear una cláusula OR para buscar el término en cualquiera de los campos definidos
+        // Usamos iLike para búsqueda insensible a mayúsculas/minúsculas en Postgres
         const searchClause = {
             [Op.or]: options.searchableFields.map(field => ({
-                [field]: { [Op.like]: `%${search}%` }
+                [field]: { [Op.iLike]: `%${search}%` }
             }))
         };
 

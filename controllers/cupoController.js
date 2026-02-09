@@ -126,12 +126,48 @@ exports.actualizarCupoBase = async (req, res) => {
         updated_at: new Date()
       }, { transaction: t });
 
+      // Actualizar cupo actual si cambia la cantidad mensual
+      if (cantidad_mensual !== undefined) {
+        const periodoActual = moment().format("YYYY-MM");
+        const cupoActual = await CupoActual.findOne({
+          where: {
+            id_cupo_base: id,
+            periodo: periodoActual
+          },
+          transaction: t
+        });
+
+        if (cupoActual) {
+          const nuevaCantidadAsignada = parseFloat(cantidad_mensual);
+          const consumida = parseFloat(cupoActual.cantidad_consumida || 0);
+          const recargada = parseFloat(cupoActual.cantidad_recargada || 0);
+
+          // REGLA DE NEGOCIO: Recalcular Cantidad Disponible
+          // Formula: Disponible = Asignada + Recargada - Consumida
+          // Si el resultado es negativo, se establece en 0
+          let nuevaDisponible = nuevaCantidadAsignada + recargada - consumida;
+          if (nuevaDisponible < 0) {
+            nuevaDisponible = 0;
+          }
+
+          await CupoActual.update({
+            cantidad_asignada: nuevaCantidadAsignada,
+            cantidad_disponible: nuevaDisponible,
+            // Actualizar estado si quedó disponible en 0
+            estado: nuevaDisponible <= 0 ? "AGOTADO" : "ACTIVO"
+          }, { where: { id_cupo_base: id }, transaction: t });
+        }
+      }
+
       req.io.emit("cupo:actualizado", cupo);
 
       res.json({ msg: "Cupo base actualizado", data: cupo });
     });
   } catch (error) {
     console.error(error);
+    if (error.statusCode === 400) {
+      if (!res.headersSent) return res.status(400).json({ msg: error.message });
+    }
     if (!res.headersSent) res.status(500).json({ msg: "Error al actualizar cupo base" });
   }
 };
@@ -345,6 +381,15 @@ exports.recargarCupo = async (req, res) => {
         return;
       }
 
+      // REGLA DE NEGOCIO: La recarga no puede hacer que la disponibilidad supere la asignada
+      const nuevaDisponibilidadEstimada = parseFloat(cupoActual.cantidad_disponible) + parseFloat(cantidad);
+      if (nuevaDisponibilidadEstimada > parseFloat(cupoActual.cantidad_asignada)) {
+        if (!res.headersSent) return res.status(400).json({
+          msg: `La recarga excede el cupo mensual asignado. Máximo a recargar: ${parseFloat(cupoActual.cantidad_asignada) - parseFloat(cupoActual.cantidad_disponible)}`
+        });
+        return;
+      }
+
       // 1. Registrar recarga
       await RecargaCupo.create({
         id_cupo_actual: cupoActual.id_cupo_actual,
@@ -461,7 +506,7 @@ exports.reiniciarCuposMensuales = async () => {
       // Nota: Esta función puede ser llamada sin objeto 'req', por lo que si se usa req.io
       // en otros lados, aquí dependemos de que io sea global o pasado si es Cron.
       // Pero como reiniciarCuposMensuales se exporta y usa en el cron, el cron ya tiene 'io'.
-      
+
       return { success: true, msg: "Reinicio mensual completado" };
 
     } catch (err) {

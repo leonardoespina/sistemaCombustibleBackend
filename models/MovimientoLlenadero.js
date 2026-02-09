@@ -65,6 +65,10 @@ const MovimientoLlenadero = sequelize.define(
       type: DataTypes.STRING(50),
       allowNull: true,
     },
+    litros_factura: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+    },
     datos_gandola: {
       type: DataTypes.STRING(50),
       allowNull: true,

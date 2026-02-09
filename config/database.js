@@ -23,13 +23,32 @@ const sequelize = new Sequelize(
 const dbConnect = async () => {
   try {
     await sequelize.authenticate();
-    console.log("✅ Conexión a PostgreSQL exitosa."); // ← CORREGIDO: PostgreSQL en lugar de MySQL
-    // Sincroniza modelos (crea tablas si no existen)
+    console.log("✅ Conexión a PostgreSQL exitosa.");
+    
+    // Sincronización controlada de modelos para evitar errores de FK
+    // Importamos modelos dinámicamente aquí para evitar dependencia circular
+    const models = require("../models");
+    
+    // Sincronización secuencial para asegurar que las tablas padre existan antes que las hijas
+    console.log("⏳ Sincronizando modelos en orden jerárquico...");
+    
+    // 1. Tablas Independientes o de Nivel 1
+    // (Usuarios, Combustibles, Categorias, Llenaderos ya suelen existir, pero sync masivo las maneja)
+    
+    // 2. Tablas de Cupos (Orden estricto)
+    if (models.CupoBase) await models.CupoBase.sync({ alter: true });
+    if (models.CupoActual) await models.CupoActual.sync({ alter: true });
+    if (models.ConsumoCupo) await models.ConsumoCupo.sync({ alter: true });
+    if (models.RecargaCupo) await models.RecargaCupo.sync({ alter: true });
+    if (models.HistorialCupoMensual) await models.HistorialCupoMensual.sync({ alter: true });
+
+    // 3. Sincronización final del resto de la base de datos
     await sequelize.sync({ alter: true });
+    
     console.log("✅ Modelos sincronizados con PostgreSQL.");
   } catch (error) {
     console.error("❌ Error conectando a PostgreSQL:", error);
-    process.exit(1); // ← Opcional: termina el proceso si no puede conectar
+    process.exit(1);
   }
 };
 
