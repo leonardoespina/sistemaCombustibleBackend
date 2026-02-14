@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const solicitudController = require("../controllers/solicitudController");
 const { autenticarUsuario } = require("../middlewares/authMiddleware");
+const { criticalLimiter } = require("../middlewares/rateLimitMiddleware");
 
 // Todas las rutas requieren autenticación
 // Se asume que authMiddleware popula req.usuario y verifica el token
@@ -14,16 +15,16 @@ router.get("/subdependencias-autorizadas", solicitudController.obtenerSubdepende
 router.get("/llenaderos-por-combustible", solicitudController.obtenerLlenaderosPorCombustible);
 
 
-// Crear Solicitud
-router.post("/", solicitudController.crearSolicitud);
+// Crear Solicitud - OPERACIÓN CRÍTICA (Afecta cupos)
+router.post("/", criticalLimiter, solicitudController.crearSolicitud);
 
 // Listar Solicitudes (con filtros)
 router.get("/", solicitudController.listarSolicitudes);
 
-// Aprobar Solicitud (Requiere rol Gerente/Jefe)
-router.put("/:id/aprobar", solicitudController.aprobarSolicitud);
+// Aprobar Solicitud (Requiere rol Gerente/Jefe) - OPERACIÓN CRÍTICA
+router.put("/:id/aprobar", criticalLimiter, solicitudController.aprobarSolicitud);
 
-// Rechazar (Anular) Solicitud
-router.put("/:id/rechazar", solicitudController.rechazarSolicitud);
+// Rechazar (Anular) Solicitud - OPERACIÓN CRÍTICA
+router.put("/:id/rechazar", criticalLimiter, solicitudController.rechazarSolicitud);
 
 module.exports = router;

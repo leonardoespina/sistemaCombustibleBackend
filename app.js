@@ -18,11 +18,10 @@ const server = http.createServer(app);
 // ============================================================
 // 2. CONFIGURACIÓN DEL SERVIDOR
 // ============================================================
-const whitelist = [
-
-  "http://localhost:5173",
-  "http://10.60.0.90:5173"
-];
+// Obtener orígenes permitidos desde el .env (separados por coma)
+const whitelist = process.env.CORS_ORIGINS 
+  ? process.env.CORS_ORIGINS.split(",") 
+  : ["http://localhost:5173"];
 
 const corsOptions = {
   origin: function (origin, callback) {
@@ -55,14 +54,9 @@ io.on("connection", (socket) => {
   });
 });
 
-// Conexión BD e Sincronización
-dbConnect().then(async () => {
-  try {
-    // Sincronizar todos los modelos (crea tablas si no existen)
-    await db.sequelize.sync({ alter: true });
-    console.log("✅ Modelos sincronizados con la Base de Datos");
-
-    // Inicializar Cron Jobs DESPUÉS de sincronizar la BD
+// Conexión BD e Inicialización del Servidor
+dbConnect().then(() => {
+    // Inicializar Cron Jobs después de que la BD esté lista
     const initCronJobs = require("./scripts/cronJobs");
     initCronJobs(io);
 
@@ -71,11 +65,10 @@ dbConnect().then(async () => {
     server.listen(PORT, () => {
       console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
     });
-
-  } catch (error) {
-    console.error("❌ Error al iniciar la aplicación:", error);
-  }
+}).catch(error => {
+    console.error("❌ Error crítico al iniciar la aplicación:", error);
 });
+
 
 // Middlewares
 app.use(cors(corsOptions));
@@ -88,6 +81,15 @@ app.use((req, res, next) => {
   req.io = io;
   next();
 });
+
+// ============================================================
+// RATE LIMITING - Protección contra abuso de API
+// ============================================================
+const { apiLimiter } = require("./middlewares/rateLimitMiddleware");
+
+// Aplicar rate limiting general a toda la API
+app.use("/api/", apiLimiter);
+
 
 // ============================================================
 // 3. RUTAS

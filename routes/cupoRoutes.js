@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const cupoController = require("../controllers/cupoController");
 const { autenticarUsuario, authorizeRole } = require("../middlewares/authMiddleware");
+const { criticalLimiter, creationLimiter } = require("../middlewares/rateLimitMiddleware");
 
 // --- RUTAS DE CONFIGURACIÓN (Cupo Base) - Solo ADMIN ---
 router.get(
@@ -10,9 +11,10 @@ router.get(
     cupoController.obtenerCuposBase
 );
 
+// Crear Cupo Base - Solo ADMIN - CON RATE LIMITING
 router.post(
     "/base", 
-    [autenticarUsuario, authorizeRole(["ADMIN"])], 
+    [autenticarUsuario, authorizeRole(["ADMIN"]), creationLimiter], 
     cupoController.crearCupoBase
 );
 
@@ -36,15 +38,17 @@ router.get(
 );
 
 // --- RUTAS DE GESTIÓN (Consumo y Recarga) - Solo ADMIN ---
+// Consumir Cupo - OPERACIÓN CRÍTICA (Afecta inventario)
 router.post(
     "/consumir", 
-    [autenticarUsuario, authorizeRole(["ADMIN"])], 
+    [autenticarUsuario, authorizeRole(["ADMIN"]), criticalLimiter], 
     cupoController.consumirCupo
 );
 
+// Recargar Cupo - OPERACIÓN CRÍTICA (Afecta inventario)
 router.post(
     "/recargar", 
-    [autenticarUsuario, authorizeRole(["ADMIN"])], 
+    [autenticarUsuario, authorizeRole(["ADMIN"]), criticalLimiter], 
     cupoController.recargarCupo
 );
 

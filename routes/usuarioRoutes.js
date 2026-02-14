@@ -4,12 +4,14 @@ const { check } = require("express-validator");
 const usuarioController = require("../controllers/usuarioController");
 const { autenticarUsuario, authorizeRole } = require("../middlewares/authMiddleware");
 const validarCampos = require("../middlewares/validationMiddleware");
+const { loginLimiter, creationLimiter } = require("../middlewares/rateLimitMiddleware");
 
 // --- RUTAS PÚBLICAS ---
 
-// POST /api/usuarios/login (Login)
+// POST /api/usuarios/login (Login) - CON RATE LIMITING RESTRICTIVO
 router.post(
   "/login",
+  loginLimiter, // 5 intentos cada 15 minutos
   [
     check("cedula", "La cédula es obligatoria").not().isEmpty(),
     check("password", "El password es obligatorio").exists(),
@@ -28,12 +30,13 @@ router.get(
   usuarioController.obtenerUsuarios
 );
 
-// POST /api/usuarios (Crear) - Solo ADMIN
+// POST /api/usuarios (Crear) - Solo ADMIN - CON RATE LIMITING
 router.post(
   "/",
   [
     autenticarUsuario,
     authorizeRole(["ADMIN"]),
+    creationLimiter, // 30 creaciones cada 10 minutos
     check("nombre", "El nombre es obligatorio").not().isEmpty(),
     check("apellido", "El apellido es obligatorio").not().isEmpty(),
     check("cedula", "La cédula es obligatoria").not().isEmpty(),
