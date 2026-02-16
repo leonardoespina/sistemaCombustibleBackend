@@ -41,6 +41,11 @@ const Dependencia = sequelize.define(
       type: DataTypes.ENUM("ACTIVO", "INACTIVO"),
       defaultValue: "ACTIVO",
     },
+    tipo_acceso_menu: {
+      type: DataTypes.ENUM("ESTANDAR", "SEGURIDAD", "ALMACEN", "OPERACIONES"),
+      defaultValue: "ESTANDAR",
+      allowNull: false,
+    },
     fecha_registro: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
@@ -53,11 +58,14 @@ const Dependencia = sequelize.define(
   {
     tableName: "dependencias",
     timestamps: false,
-  }
+  },
 );
 
 Dependencia.associate = (models) => {
-  Dependencia.belongsTo(models.Categoria, { foreignKey: "id_categoria", as: "Categoria" });
+  Dependencia.belongsTo(models.Categoria, {
+    foreignKey: "id_categoria",
+    as: "Categoria",
+  });
   Dependencia.hasMany(models.Subdependencia, { foreignKey: "id_dependencia" });
   Dependencia.hasMany(models.Usuario, { foreignKey: "id_dependencia" });
   Dependencia.hasMany(models.Biometria, { foreignKey: "id_dependencia" });

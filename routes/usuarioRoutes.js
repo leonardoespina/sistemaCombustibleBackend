@@ -2,9 +2,15 @@ const express = require("express");
 const router = express.Router();
 const { check } = require("express-validator");
 const usuarioController = require("../controllers/usuarioController");
-const { autenticarUsuario, authorizeRole } = require("../middlewares/authMiddleware");
+const {
+  autenticarUsuario,
+  authorizeRole,
+} = require("../middlewares/authMiddleware");
 const validarCampos = require("../middlewares/validationMiddleware");
-const { loginLimiter, creationLimiter } = require("../middlewares/rateLimitMiddleware");
+const {
+  loginLimiter,
+  creationLimiter,
+} = require("../middlewares/rateLimitMiddleware");
 
 // --- RUTAS PÚBLICAS ---
 
@@ -17,17 +23,37 @@ router.post(
     check("password", "El password es obligatorio").exists(),
     validarCampos,
   ],
-  usuarioController.loginUsuario
+  usuarioController.loginUsuario,
+);
+
+// POST /api/usuarios/logout (Logout) - Requiere estar autenticado
+router.post("/logout", autenticarUsuario, usuarioController.logoutUsuario);
+
+// PUT /api/usuarios/cambiar-password (Cambiar propia contraseña)
+router.put(
+  "/cambiar-password",
+  autenticarUsuario,
+  [
+    check("passwordActual", "La contraseña actual es obligatoria")
+      .not()
+      .isEmpty(),
+    check(
+      "nuevaPassword",
+      "La nueva contraseña debe tener al menos 6 caracteres",
+    ).isLength({ min: 6 }),
+    validarCampos,
+  ],
+  usuarioController.cambiarPassword,
 );
 
 // --- RUTAS PROTEGIDAS (Requieren Token) ---
 
 // GET /api/usuarios (Listar) - Solo ADMIN
 router.get(
-  "/", 
-  autenticarUsuario, 
-  authorizeRole(["ADMIN"]), 
-  usuarioController.obtenerUsuarios
+  "/",
+  autenticarUsuario,
+  authorizeRole(["ADMIN"]),
+  usuarioController.obtenerUsuarios,
 );
 
 // POST /api/usuarios (Crear) - Solo ADMIN - CON RATE LIMITING
@@ -43,7 +69,7 @@ router.post(
     check("password", "Mínimo 6 caracteres").isLength({ min: 6 }),
     validarCampos,
   ],
-  usuarioController.crearUsuario
+  usuarioController.crearUsuario,
 );
 
 // PUT /api/usuarios/:id (Actualizar) - Solo ADMIN
@@ -56,17 +82,17 @@ router.put(
     check("apellido", "El apellido es obligatorio").optional().not().isEmpty(),
     // Si envían password, validamos longitud
     //check("password", "Mínimo 6 caracteres").optional().isLength({ min: 6 }),
-  //  validarCampos,
+    //  validarCampos,
   ],
-  usuarioController.actualizarUsuario
+  usuarioController.actualizarUsuario,
 );
 
 // DELETE /api/usuarios/:id (Desactivar) - Solo ADMIN
 router.delete(
-  "/:id", 
-  autenticarUsuario, 
-  authorizeRole(["ADMIN"]), 
-  usuarioController.desactivarUsuario
+  "/:id",
+  autenticarUsuario,
+  authorizeRole(["ADMIN"]),
+  usuarioController.desactivarUsuario,
 );
 
 module.exports = router;

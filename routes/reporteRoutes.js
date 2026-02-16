@@ -5,14 +5,34 @@ const { autenticarUsuario } = require("../middlewares/authMiddleware");
 
 // Ruta para generar el reporte diario
 // GET /api/reportes/diario?id_llenadero=1&fecha=2026-02-05
-router.get("/diario", autenticarUsuario, reporteController.generarReporteDiario);
+router.get(
+  "/diario",
+  autenticarUsuario,
+  reporteController.generarReporteDiario,
+);
 
 // Ruta para generar el reporte detallado de despachos (Filtros: Dependencia, Fechas)
 // GET /api/reportes/despachos?id_dependencia=X&id_subdependencia=Y&fecha_desde=...&fecha_hasta=...
-router.get("/despachos", autenticarUsuario, reporteController.consultarDespachos);
+router.get(
+  "/despachos",
+  autenticarUsuario,
+  reporteController.consultarDespachos,
+);
 
 // Ruta para el reporte de consumo agregado por dependencia y tipo de combustible
 // GET /api/reportes/consumo-dependencia?fecha_desde=...&fecha_hasta=...
-router.get("/consumo-dependencia", autenticarUsuario, reporteController.obtenerConsumoPorDependencia);
+router.get(
+  "/consumo-dependencia",
+  autenticarUsuario,
+  reporteController.obtenerConsumoPorDependencia,
+);
+
+// Ruta para que CUALQUIER USUARIO vea sus cupos asignados (Dependencia/Subdependencia)
+// GET /api/reportes/mis-cupos?periodo=2024-02
+router.get(
+  "/mis-cupos",
+  autenticarUsuario,
+  reporteController.obtenerReporteCuposUsuario,
+);
 
 module.exports = router;

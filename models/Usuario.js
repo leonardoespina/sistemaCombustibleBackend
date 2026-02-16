@@ -11,7 +11,15 @@ const Usuario = sequelize.define(
       autoIncrement: true,
     },
     tipo_usuario: {
-      type: DataTypes.ENUM("ADMIN","GERENTE","JEFE DIVISION", "SUPERVISOR","COORDINADOR", "INSPECTOR","ALMACENISTA"),
+      type: DataTypes.ENUM(
+        "ADMIN",
+        "GERENTE",
+        "JEFE DIVISION",
+        "SUPERVISOR",
+        "COORDINADOR",
+        "INSPECTOR",
+        "ALMACENISTA",
+      ),
       allowNull: false,
     },
     nombre: {
@@ -65,11 +73,16 @@ const Usuario = sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: true,
     },
+    id_sesion: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      comment: "ID de sesión único para control de acceso único por cuenta",
+    },
   },
   {
     tableName: "usuarios", // Forzamos el nombre de tu tabla existente
     timestamps: false, // No usamos createdAt/updatedAt de Sequelize
-  }
+  },
 );
 
 // Método para quitar el password al devolver JSON
@@ -80,10 +93,19 @@ Usuario.prototype.toJSON = function () {
 };
 
 Usuario.associate = (models) => {
-  Usuario.belongsTo(models.Categoria, { foreignKey: "id_categoria", as: "Categoria" });
-  Usuario.belongsTo(models.Dependencia, { foreignKey: "id_dependencia", as: "Dependencia" });
-  Usuario.belongsTo(models.Subdependencia, { foreignKey: "id_subdependencia", as: "Subdependencia" });
-  
+  Usuario.belongsTo(models.Categoria, {
+    foreignKey: "id_categoria",
+    as: "Categoria",
+  });
+  Usuario.belongsTo(models.Dependencia, {
+    foreignKey: "id_dependencia",
+    as: "Dependencia",
+  });
+  Usuario.belongsTo(models.Subdependencia, {
+    foreignKey: "id_subdependencia",
+    as: "Subdependencia",
+  });
+
   Usuario.hasMany(models.RecargaCupo, { foreignKey: "autorizado_por" });
 };
 
