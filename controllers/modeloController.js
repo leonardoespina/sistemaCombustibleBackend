@@ -1,53 +1,22 @@
-const Modelo = require("../models/Modelo");
-const Marca = require("../models/Marca");
-const { paginate } = require("../helpers/paginationHelper");
-const { withTransaction } = require("../helpers/transactionHelper");
-const { Op } = require("sequelize");
+const modeloService = require("../services/modeloService");
 
 // --- CREAR MODELO (Solo Admin) ---
 exports.crearModelo = async (req, res) => {
-  const { nombre, id_marca } = req.body;
-
   try {
-    await withTransaction(req, async (t) => {
-      // 1. Validar que la Marca exista
-      const marcaExiste = await Marca.findByPk(id_marca, { transaction: t });
-      if (!marcaExiste) {
-        return res.status(404).json({ msg: "La marca seleccionada no existe." });
-      }
+    const nuevoModelo = await modeloService.crearModelo(req.body, req.ip);
 
-      // 2. Validar duplicado (Mismo nombre en la misma marca)
-      const modeloExiste = await Modelo.findOne({
-        where: { nombre, id_marca },
-        transaction: t,
-      });
-      if (modeloExiste) {
-        return res
-          .status(400)
-          .json({ msg: `El modelo '${nombre}' ya existe en esta marca.` });
-      }
+    // Notificar vía socket
+    if (req.io) req.io.emit("modelo:creado", nuevoModelo);
 
-      // 3. Crear
-      const nuevoModelo = await Modelo.create(
-        {
-          nombre,
-          id_marca,
-          estado: "ACTIVO",
-          
-        },
-        { transaction: t }
-      );
-
-      // Notificar vía socket
-      req.io.emit("modelo:creado", nuevoModelo);
-
-      res.status(201).json({
-        msg: "Modelo creado exitosamente",
-        modelo: nuevoModelo,
-      });
+    res.status(201).json({
+      msg: "Modelo creado exitosamente",
+      modelo: nuevoModelo,
     });
   } catch (error) {
     console.error(error);
+    if (error.status === 404 || error.status === 400) {
+      return res.status(error.status).json({ msg: error.message });
+    }
     if (!res.headersSent) {
       res.status(500).json({ msg: "Error al crear modelo" });
     }
@@ -57,25 +26,7 @@ exports.crearModelo = async (req, res) => {
 // --- OBTENER MODELOS (Solo Admin - Paginado) ---
 exports.obtenerModelos = async (req, res) => {
   try {
-    const searchableFields = ["nombre"];
-    const where = {};
-    
-    // Si no es admin, filtramos por activos
-    if (req.usuario.tipo_usuario !== "ADMIN") {
-      where.estado = "ACTIVO";
-    }
-
-    const result = await paginate(Modelo, req.query, {
-      where,
-      searchableFields,
-      include: [
-        {
-          model: Marca,
-          attributes: ["nombre"],
-        },
-      ],
-    });
-
+    const result = await modeloService.obtenerModelos(req.query, req.usuario);
     res.json(result);
   } catch (error) {
     console.error(error);
@@ -86,55 +37,18 @@ exports.obtenerModelos = async (req, res) => {
 // --- ACTUALIZAR MODELO (Solo Admin) ---
 exports.actualizarModelo = async (req, res) => {
   const { id } = req.params;
-  const { nombre, id_marca, estado } = req.body;
 
   try {
-    await withTransaction(req, async (t) => {
-      const modelo = await Modelo.findByPk(id, { transaction: t });
-      if (!modelo) {
-        return res.status(404).json({ msg: "Modelo no encontrado" });
-      }
+    const modelo = await modeloService.actualizarModelo(id, req.body, req.ip);
 
-      // Validar si cambia la marca
-      if (id_marca && id_marca !== modelo.id_marca) {
-        const marcaExiste = await Marca.findByPk(id_marca, { transaction: t });
-        if (!marcaExiste) {
-          return res.status(404).json({ msg: "La nueva marca no existe" });
-        }
-        modelo.id_marca = id_marca;
-      }
+    if (req.io) req.io.emit("modelo:actualizado", modelo);
 
-      // Validar duplicado si cambia nombre o marca
-      if (nombre || id_marca) {
-        const checkNombre = nombre || modelo.nombre;
-        const checkMarca = id_marca || modelo.id_marca;
-        
-        const existe = await Modelo.findOne({
-          where: {
-            nombre: checkNombre,
-            id_marca: checkMarca,
-            id_modelo: { [Op.ne]: id }
-          },
-          transaction: t
-        });
-        
-        if (existe) {
-          return res.status(400).json({ msg: "Ya existe un modelo con ese nombre en esa marca" });
-        }
-      }
-
-      if (nombre) modelo.nombre = nombre;
-      if (estado) modelo.estado = estado;
-
-      modelo.fecha_modificacion = new Date();
-      await modelo.save({ transaction: t });
-
-      req.io.emit("modelo:actualizado", modelo);
-
-      res.json({ msg: "Modelo actualizado", modelo });
-    });
+    res.json({ msg: "Modelo actualizado", modelo });
   } catch (error) {
     console.error(error);
+    if (error.status === 404 || error.status === 400) {
+      return res.status(error.status).json({ msg: error.message });
+    }
     if (!res.headersSent) {
       res.status(500).json({ msg: "Error al actualizar modelo" });
     }
@@ -146,26 +60,17 @@ exports.desactivarModelo = async (req, res) => {
   const { id } = req.params;
 
   try {
-    await withTransaction(req, async (t) => {
-      const modelo = await Modelo.findByPk(id, { transaction: t });
-      if (!modelo) {
-        return res.status(404).json({ msg: "Modelo no encontrado" });
-      }
+    const result = await modeloService.desactivarModelo(id, req.ip);
 
-      await modelo.update(
-        {
-          estado: "INACTIVO",
-          fecha_modificacion: new Date(),
-        },
-        { transaction: t }
-      );
-
+    if (req.io)
       req.io.emit("modelo:actualizado", { id_modelo: id, estado: "INACTIVO" });
 
-      res.json({ msg: "Modelo desactivado exitosamente" });
-    });
+    res.json({ msg: "Modelo desactivado exitosamente" });
   } catch (error) {
     console.error(error);
+    if (error.status === 404) {
+      return res.status(404).json({ msg: error.message });
+    }
     if (!res.headersSent) {
       res.status(500).json({ msg: "Error al desactivar modelo" });
     }

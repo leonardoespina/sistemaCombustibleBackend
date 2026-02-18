@@ -52,7 +52,21 @@ io.activeSockets = activeSockets; // Exponerlo para los controladores
 io.on("connection", (socket) => {
   console.log("Cliente conectado a Socket.io:", socket.id);
 
-  socket.on("usuario:identificar", (id_usuario) => {
+  socket.on("usuario:identificar", (id_usuario_raw) => {
+    // Normalizar ID a número para evitar discrepancias de tipos
+    const id_usuario = Number(id_usuario_raw);
+    const id_viejo = socket.id_usuario;
+
+    // LIMPIEZA PROACTIVA: Si el socket ya estaba identificado con otro usuario, lo removemos del anterior
+    if (id_viejo && id_viejo !== id_usuario) {
+      if (activeSockets.has(id_viejo)) {
+        activeSockets.get(id_viejo).delete(socket.id);
+        if (activeSockets.get(id_viejo).size === 0)
+          activeSockets.delete(id_viejo);
+      }
+      socket.leave(`usuario_${id_viejo}`);
+    }
+
     socket.id_usuario = id_usuario;
     socket.join(`usuario_${id_usuario}`);
 
@@ -63,7 +77,7 @@ io.on("connection", (socket) => {
     activeSockets.get(id_usuario).add(socket.id);
 
     console.log(
-      `Usuario ${id_usuario} conectado. Sockets activos: ${activeSockets.get(id_usuario).size}`,
+      `Usuario ${id_usuario} identificado (Socket: ${socket.id}). Sockets activos del usuario: ${activeSockets.get(id_usuario).size}`,
     );
   });
 
@@ -82,26 +96,15 @@ io.on("connection", (socket) => {
       if (userSockets.size === 0) {
         activeSockets.delete(id_usuario);
 
-        // Esperamos un breve periodo (ej: 10 seg) antes de liberar la sesión en BD
-        // Esto evita expulsiones por recargas de página o parpadeos de internet
-        setTimeout(async () => {
-          // Verificamos si en este tiempo el usuario no volvió a conectar
-          if (!activeSockets.has(id_usuario)) {
-            try {
-              const { Usuario } = require("./models");
-              // Solo liberamos si no hay nuevas conexiones
-              await Usuario.update(
-                { id_sesion: null },
-                { where: { id_usuario: id_usuario } },
-              );
-              console.log(
-                `Sesión del usuario ${id_usuario} liberada tras periodo de gracia.`,
-              );
-            } catch (error) {
-              console.error("Error al liberar sesión diferida:", error);
-            }
-          }
-        }, 10000);
+        // NO liberamos la sesión en BD automáticamente al desconectar el socket.
+        // La sesión solo se debe invalidar si:
+        // 1. El usuario hace Logout explícito.
+        // 2. El usuario inicia sesión en otro dispositivo (se sobreescribe el id_sesion).
+        // Borrarla aquí causaba expulsiones inesperadas durante recargas o fallos de red.
+
+        console.log(
+          `Todos los sockets del usuario ${id_usuario} se han cerrado.`,
+        );
       }
     }
   });
@@ -167,7 +170,6 @@ app.use(
 app.use("/api/evaporaciones", require("./routes/evaporacionRoutes"));
 app.use("/api/tanques", require("./routes/tanqueRoutes"));
 
-app.use("/api/dispensadores", require("./routes/dispensadorRoutes"));
 app.use("/api/solicitudes", require("./routes/solicitudRoutes"));
 app.use("/api/despacho", require("./routes/despachoRoutes"));
 app.use("/api/validacion", require("./routes/validacionRoutes"));

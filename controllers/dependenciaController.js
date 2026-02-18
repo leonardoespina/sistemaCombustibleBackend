@@ -1,64 +1,22 @@
-const Dependencia = require("../models/Dependencia");
-const Categoria = require("../models/Categoria");
-const { paginate } = require("../helpers/paginationHelper");
-const { withTransaction } = require("../helpers/transactionHelper");
-const { Op } = require("sequelize");
+const dependenciaService = require("../services/dependenciaService");
 
 // --- CREAR DEPENDENCIA ---
 exports.crearDependencia = async (req, res) => {
-  const {
-    id_categoria,
-    nombre_dependencia,
-    codigo,
-    tipo_venta,
-    estatus,
-    tipo_acceso_menu,
-  } = req.body;
-
   try {
-    await withTransaction(req, async (t) => {
-      // Validar que exista la Categoría
-      const categoria = await Categoria.findByPk(id_categoria, {
-        transaction: t,
-      });
-      if (!categoria) {
-        return res.status(404).json({ msg: "Categoría no encontrada" });
-      }
+    const result = await dependenciaService.crearDependencia(req.body, req.ip);
 
-      // Verificar si ya existe una dependencia con el mismo nombre
-      const existe = await Dependencia.findOne({
-        where: { nombre_dependencia },
-        transaction: t,
-      });
-      if (existe) {
-        return res
-          .status(400)
-          .json({ msg: "La dependencia ya existe con ese nombre" });
-      }
+    // Notificar a clientes
+    if (req.io) req.io.emit("dependencia:creado", result.dependencia);
 
-      const dependencia = await Dependencia.create(
-        {
-          id_categoria,
-          nombre_dependencia,
-          codigo,
-          tipo_venta: tipo_venta || "INSTITUCIONAL",
-          estatus: estatus || "ACTIVO",
-          tipo_acceso_menu: tipo_acceso_menu || "ESTANDAR",
-          fecha_registro: new Date(),
-          fecha_modificacion: new Date(),
-        },
-        { transaction: t },
-      );
-
-      // Notificar a clientes
-      req.io.emit("dependencia:creado", dependencia);
-
-      res
-        .status(201)
-        .json({ msg: "Dependencia creada exitosamente", dependencia });
-    });
+    res.status(201).json(result);
   } catch (error) {
     console.error(error);
+    if (error.message === "Categoría no encontrada") {
+      return res.status(404).json({ msg: error.message });
+    }
+    if (error.message.includes("ya existe")) {
+      return res.status(400).json({ msg: error.message });
+    }
     if (!res.headersSent) {
       res.status(500).json({ msg: "Error al crear dependencia" });
     }
@@ -68,26 +26,11 @@ exports.crearDependencia = async (req, res) => {
 // --- OBTENER DEPENDENCIAS ---
 exports.obtenerDependencias = async (req, res) => {
   try {
-    const searchableFields = ["nombre_dependencia", "codigo"];
-
-    // Incluir datos de la Categoría
-    const include = [
-      { model: Categoria, as: "Categoria", attributes: ["nombre"] },
-    ];
-
-    const where = {};
-    // Si NO es admin, forzamos que solo vea los activos.
-    if (!req.usuario || req.usuario.tipo_usuario !== "ADMIN") {
-      where.estatus = "ACTIVO";
-    }
-
-    const paginatedResults = await paginate(Dependencia, req.query, {
-      searchableFields,
-      include,
-      where,
-    });
-
-    res.json(paginatedResults);
+    const result = await dependenciaService.obtenerDependencias(
+      req.query,
+      req.usuario,
+    );
+    res.json(result);
   } catch (error) {
     console.error(error);
     res.status(500).json({ msg: "Error al obtener dependencias" });
@@ -97,66 +40,25 @@ exports.obtenerDependencias = async (req, res) => {
 // --- ACTUALIZAR DEPENDENCIA ---
 exports.actualizarDependencia = async (req, res) => {
   const { id } = req.params;
-  const {
-    id_categoria,
-    nombre_dependencia,
-    codigo,
-    tipo_venta,
-    estatus,
-    tipo_acceso_menu,
-  } = req.body;
 
   try {
-    await withTransaction(req, async (t) => {
-      const dependencia = await Dependencia.findByPk(id, { transaction: t });
-      if (!dependencia) {
-        return res.status(404).json({ msg: "Dependencia no encontrada" });
-      }
+    const result = await dependenciaService.actualizarDependencia(
+      id,
+      req.body,
+      req.ip,
+    );
 
-      if (id_categoria) {
-        const categoria = await Categoria.findByPk(id_categoria, {
-          transaction: t,
-        });
-        if (!categoria)
-          return res.status(404).json({ msg: "Categoría no encontrada" });
-        dependencia.id_categoria = id_categoria;
-      }
+    if (req.io) req.io.emit("dependencia:actualizado", result.dependencia);
 
-      // Validar que el nombre no se repita
-      if (
-        nombre_dependencia &&
-        nombre_dependencia !== dependencia.nombre_dependencia
-      ) {
-        const existe = await Dependencia.findOne({
-          where: {
-            nombre_dependencia,
-            id_dependencia: { [Op.ne]: id },
-          },
-          transaction: t,
-        });
-        if (existe) {
-          return res
-            .status(400)
-            .json({ msg: "La dependencia ya existe con ese nombre" });
-        }
-        dependencia.nombre_dependencia = nombre_dependencia;
-      }
-
-      if (codigo) dependencia.codigo = codigo;
-      if (tipo_venta) dependencia.tipo_venta = tipo_venta;
-      if (estatus) dependencia.estatus = estatus;
-      if (tipo_acceso_menu) dependencia.tipo_acceso_menu = tipo_acceso_menu;
-
-      dependencia.fecha_modificacion = new Date();
-
-      await dependencia.save({ transaction: t });
-
-      req.io.emit("dependencia:actualizado", dependencia);
-
-      res.json({ msg: "Dependencia actualizada", dependencia });
-    });
+    res.json(result);
   } catch (error) {
     console.error(error);
+    if (error.message.includes("no encontrada")) {
+      return res.status(404).json({ msg: error.message });
+    }
+    if (error.message.includes("ya existe")) {
+      return res.status(400).json({ msg: error.message });
+    }
     if (!res.headersSent) {
       res.status(500).json({ msg: "Error al actualizar dependencia" });
     }
@@ -167,21 +69,16 @@ exports.actualizarDependencia = async (req, res) => {
 exports.desactivarDependencia = async (req, res) => {
   const { id } = req.params;
   try {
-    await withTransaction(req, async (t) => {
-      const dependencia = await Dependencia.findByPk(id, { transaction: t });
-      if (!dependencia)
-        return res.status(404).json({ msg: "Dependencia no encontrada" });
+    const result = await dependenciaService.desactivarDependencia(id, req.ip);
 
-      await dependencia.update(
-        { estatus: "INACTIVO", fecha_modificacion: new Date() },
-        { transaction: t },
-      );
+    if (req.io) req.io.emit("dependencia:actualizado", result.dependencia);
 
-      req.io.emit("dependencia:actualizado", dependencia);
-      res.json({ msg: "Dependencia desactivada" });
-    });
+    res.json({ msg: result.msg });
   } catch (error) {
     console.error(error);
+    if (error.message === "Dependencia no encontrada") {
+      return res.status(404).json({ msg: error.message });
+    }
     if (!res.headersSent) {
       res.status(500).json({ msg: "Error al desactivar" });
     }
@@ -191,12 +88,8 @@ exports.desactivarDependencia = async (req, res) => {
 // --- LISTAR TODAS (Para selectores) ---
 exports.listarTodas = async (req, res) => {
   try {
-    const dependencias = await Dependencia.findAll({
-      where: { estatus: "ACTIVO" },
-      attributes: ["id_dependencia", "nombre_dependencia", "id_categoria"],
-      order: [["nombre_dependencia", "ASC"]],
-    });
-    res.json({ data: dependencias });
+    const result = await dependenciaService.listarTodas();
+    res.json(result);
   } catch (error) {
     console.error(error);
     res.status(500).json({ msg: "Error al listar dependencias" });

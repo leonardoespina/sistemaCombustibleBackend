@@ -1,112 +1,36 @@
-const Biometria = require("../models/Biometria");
-const Categoria = require("../models/Categoria");
-const Dependencia = require("../models/Dependencia");
-const Subdependencia = require("../models/Subdependencia");
-const { paginate } = require("../helpers/paginationHelper");
-const { withTransaction } = require("../helpers/transactionHelper");
-const { Op } = require("sequelize");
-const axios = require("axios");
-
-// ============================================================================
-// 🔧 CONFIGURACIÓN SIMPLE - COMENTA/DESCOMENTA SEGÚN NECESITES
-// ============================================================================
-
-// 🏠 PARA PRUEBAS LOCALES (descomenta esta línea, comenta la otra)
- const BIOMETRIC_SERVICE_URL = "http://localhost:7000";
-
-// 🌐 PARA PRODUCCIÓN/RENDER (descomenta esta línea, comenta la otra)
-//const BIOMETRIC_SERVICE_URL = "https://captura-huellas-microservicio.onrender.com";
-
-// ⚠️ IMPORTANTE: Solo una línea debe estar descomentada a la vez
-// ============================================================================
-
-console.log(`✅ Microservicio configurado: ${BIOMETRIC_SERVICE_URL}`);
+const biometriaService = require("../services/biometriaService");
 
 /**
- * Servicio de Biometría
- * Maneja el registro y la verificación (matching) de huellas dactilares.
+ * Servicio de Biometría (Controller Refactorizado)
+ * Delega la lógica de negocio al servicio biometriaService.js
  */
 
 // --- REGISTRAR BIOMETRÍA (CREAR O ACTUALIZAR) ---
 exports.registrarBiometria = async (req, res) => {
-  const { id_biometria, cedula, nombre, rol, id_categoria, id_dependencia, id_subdependencia, huellas } = req.body;
-
   try {
-    await withTransaction(req, async (t) => {
-      let registro;
+    // Pasamos req.ip para auditoría
+    const result = await biometriaService.registrarBiometria(req.body, req.ip);
 
-      // CASO 1: ACTUALIZACIÓN (Si viene ID)
-      if (id_biometria) {
-        registro = await Biometria.findByPk(id_biometria, { transaction: t });
-        if (!registro) {
-          return res.status(404).json({ msg: "Registro biométrico no encontrado para actualizar" });
-        }
+    // Emitir evento Socket.IO (responsabilidad del controlador/capa web)
+    if (req.io) req.io.emit("biometria:actualizado", result.registro);
 
-        // Validar si cambió la cédula y si la nueva ya existe en otro registro
-        if (cedula && cedula !== registro.cedula) {
-          const cedulaExiste = await Biometria.findOne({ 
-            where: { cedula, id_biometria: { [Op.ne]: id_biometria } }, 
-            transaction: t 
-          });
-          if (cedulaExiste) {
-            return res.status(400).json({ msg: `La cédula ${cedula} ya está registrada por otra persona.` });
-          }
-        }
-
-        // Actualizar datos básicos
-        const updateData = {
-          cedula, nombre, rol, id_categoria, id_dependencia, id_subdependencia, fecha_modificacion: new Date()
-        };
-
-        // Actualizar huellas SOLO si se enviaron nuevas
-        if (huellas && huellas.length > 0) {
-          updateData.template = JSON.stringify({
-            templates: huellas,
-            updatedAt: new Date().toISOString()
-          });
-        }
-
-        await registro.update(updateData, { transaction: t });
-      
-      } else {
-        // CASO 2: CREACIÓN (Nuevo Registro)
-        
-        // Validación de Duplicados
-        const existe = await Biometria.findOne({ where: { cedula }, transaction: t });
-        if (existe) {
-          return res.status(400).json({ msg: `La cédula ${cedula} ya posee un registro biométrico activo o inactivo.` });
-        }
-
-        // Validar que vengan huellas para un registro nuevo
-        if (!huellas || huellas.length === 0) {
-          return res.status(400).json({ msg: "Se requieren muestras de huellas para un nuevo registro." });
-        }
-
-        const biometricData = JSON.stringify({
-          templates: huellas,
-          updatedAt: new Date().toISOString()
-        });
-
-        registro = await Biometria.create({
-          cedula,
-          nombre,
-          rol,
-          id_categoria,
-          id_dependencia,
-          id_subdependencia,
-          template: biometricData
-        }, { transaction: t });
-      }
-
-      req.io.emit("biometria:actualizado", registro);
-
-      res.status(201).json({
-        msg: id_biometria ? "Registro actualizado correctamente" : "Identidad biométrica registrada correctamente",
-        registro
-      });
-    });
+    res.status(201).json(result);
   } catch (error) {
     console.error("Error en registrarBiometria:", error);
+    // Manejo básico de errores de negocio vs servidor
+    if (
+      error.message.includes("no encontrado") ||
+      error.message.includes("no registrada")
+    ) {
+      return res.status(404).json({ msg: error.message });
+    }
+    if (
+      error.message.includes("ya posee") ||
+      error.message.includes("ya está registrada") ||
+      error.message.includes("requieren")
+    ) {
+      return res.status(400).json({ msg: error.message });
+    }
     res.status(500).json({ msg: "Error al procesar registro biométrico" });
   }
 };
@@ -115,133 +39,53 @@ exports.registrarBiometria = async (req, res) => {
 exports.compararHuellas = async (req, res) => {
   const { muestra1, muestra2 } = req.body;
 
-  if (!muestra1 || !muestra2) {
-    return res.status(400).json({ msg: "Se requieren ambas muestras para comparar" });
-  }
-
   try {
-    // ✅ URL completa: base + /api/verify
-    const response = await axios.post(
-      `${BIOMETRIC_SERVICE_URL}/api/verify`,
-      {
-        probe: muestra1,
-        candidate: muestra2
-      }, 
-      {
-        // Timeout diferente según entorno
-        timeout: BIOMETRIC_SERVICE_URL.includes("localhost") ? 10000 : 30000,
-        headers: { 'Content-Type': 'application/json' }
-      }
-    );
-
-    res.json(response.data);
+    const result = await biometriaService.compararHuellas(muestra1, muestra2);
+    res.json(result);
   } catch (error) {
-    console.error("❌ Error en comparación directa:", error.message);
-    
-    // Mensaje útil según entorno
-    if (BIOMETRIC_SERVICE_URL.includes("localhost")) {
-      console.log("💡 ¿Está corriendo el microservicio Java? (puerto 7000)");
-    } else {
-      console.log("💡 El servicio en Render puede estar en 'cold start' (espere 30-60s)");
+    console.error("Error en compararHuellas:", error.message);
+    if (error.message.includes("requieren")) {
+      return res.status(400).json({ msg: error.message });
     }
-    
-    res.status(500).json({ 
+    res.status(500).json({
       msg: "Error en el servicio biométrico",
       detalle: error.message,
-      urlUsada: `${BIOMETRIC_SERVICE_URL}/api/verify`
     });
   }
 };
 
 // --- VERIFICAR IDENTIDAD (MATCHING 1:1 CONTRA BD) ---
 exports.verificarIdentidad = async (req, res) => {
-  const { cedula, muestraActual } = req.body; 
-  
-  console.log("=== INICIO VERIFICACIÓN BIOMÉTRICA ===");
-  console.log("🔧 Entorno:", BIOMETRIC_SERVICE_URL.includes("localhost") ? "LOCAL" : "RENDER");
-  console.log("🔍 Cédula:", cedula);
-  console.log("📏 Longitud muestra:", muestraActual?.length || 0);
-
-  if (!cedula || !muestraActual) {
-    return res.status(400).json({ msg: "Cédula y muestra biométrica son requeridas" });
-  }
+  const { cedula, muestraActual } = req.body;
 
   try {
-    const registro = await Biometria.findOne({ 
-      where: { cedula, estado: "ACTIVO" }
-    });
+    const result = await biometriaService.verificarIdentidad(
+      cedula,
+      muestraActual,
+    );
 
-    if (!registro) {
-      console.log("❌ Cédula no encontrada");
-      return res.status(404).json({ match: false, msg: "Persona no registrada" });
+    // Si no hubo match, el servicio devuelve un objeto con match: false pero sin lanzar error
+    if (result.match === false && result.msg === "Persona no registrada") {
+      return res.status(404).json(result);
     }
 
-    const biometricData = JSON.parse(registro.template);
-    
-    console.log(`🔢 Comparando contra ${biometricData.templates.length} template(s)`);
-    
-    const matchPromises = biometricData.templates.map(async (templateGuardado, index) => {
-      try {
-        console.log(`📤 Enviando comparación ${index + 1}...`);
-        
-        const response = await axios.post(
-          `${BIOMETRIC_SERVICE_URL}/api/verify`,
-          {
-            probe: muestraActual,
-            candidate: templateGuardado
-          }, 
-          {
-            // Timeout ajustado según entorno
-            timeout: BIOMETRIC_SERVICE_URL.includes("localhost") ? 10000 : 30000,
-            headers: { 'Content-Type': 'application/json' }
-          }
-        );
-
-        const { match, score } = response.data;
-        console.log(`✅ Template ${index + 1} - Score: ${score}, Match: ${match}`);
-        return score;
-      } catch (error) {
-        console.error(`❌ Error template ${index + 1}:`, error.message);
-        
-        // Diagnóstico específico
-        if (error.code === 'ECONNREFUSED' && BIOMETRIC_SERVICE_URL.includes("localhost")) {
-          console.log("🔥 MICROSERVICIO LOCAL NO DISPONIBLE");
-          console.log("   Ejecuta: java -jar target\\biometric-service-1.0-SNAPSHOT.jar");
-        }
-        
-        return 0;
-      }
-    });
-
-    const scores = await Promise.all(matchPromises);
-    const mejorScore = Math.max(...scores);
-    const umbral = 40;
-
-    console.log(`🎯 Mejor score: ${mejorScore} (umbral: ${umbral})`);
-
-    if (mejorScore >= umbral) {
-      console.log(`✅ MATCH ENCONTRADO!`);
-      res.json({ 
-        match: true, 
-        score: mejorScore, 
-        persona: registro,
-        entorno: BIOMETRIC_SERVICE_URL.includes("localhost") ? "LOCAL" : "RENDER"
-      });
-    } else {
-      console.log("❌ NO HAY COINCIDENCIA");
-      res.status(200).json({ 
-        match: false, 
-        msg: "La huella no coincide",
-        score: mejorScore,
-        entorno: BIOMETRIC_SERVICE_URL.includes("localhost") ? "LOCAL" : "RENDER"
-      });
+    // Si no hubo match pero la persona existe
+    if (result.match === false) {
+      return res.status(200).json(result);
     }
 
+    res.json(result);
   } catch (error) {
-    console.error("💥 Error general:", error);
-    res.status(500).json({ 
+    console.error("Error en verificarIdentidad:", error);
+    if (error.message === "Persona no registrada") {
+      return res.status(404).json({ match: false, msg: error.message });
+    }
+    if (error.message.includes("requeridas")) {
+      return res.status(400).json({ msg: error.message });
+    }
+    res.status(500).json({
       msg: "Error durante la verificación biométrica",
-      detalle: error.message
+      detalle: error.message,
     });
   }
 };
@@ -249,22 +93,10 @@ exports.verificarIdentidad = async (req, res) => {
 // --- OBTENER REGISTROS (CRUD) ---
 exports.obtenerRegistros = async (req, res) => {
   try {
-    const searchableFields = ["nombre", "cedula"];
-    const where = { estado: "ACTIVO" };
-
-    const results = await paginate(Biometria, req.query, {
-      where,
-      searchableFields,
-      include: [
-        { model: Categoria, as: "Categoria", attributes: ["nombre"] },
-        { model: Dependencia, as: "Dependencia", attributes: ["nombre_dependencia"] },
-        { model: Subdependencia, as: "Subdependencia", attributes: ["nombre"] },
-      ]
-    });
-
+    const results = await biometriaService.obtenerRegistros(req.query);
     res.json(results);
   } catch (error) {
-    console.error(error);
+    console.error("Error en obtenerRegistros:", error);
     res.status(500).json({ msg: "Error al obtener listado biométrico" });
   }
 };
@@ -273,15 +105,20 @@ exports.obtenerRegistros = async (req, res) => {
 exports.eliminarRegistro = async (req, res) => {
   const { id } = req.params;
   try {
-    const registro = await Biometria.findByPk(id);
-    if (!registro) return res.status(404).json({ msg: "Registro no encontrado" });
+    const result = await biometriaService.eliminarRegistro(id);
 
-    await registro.update({ estado: "INACTIVO", fecha_modificacion: new Date() });
-    
-    req.io.emit("biometria:actualizado", { id_biometria: id, estado: "INACTIVO" });
-    res.json({ msg: "Registro biométrico desactivado" });
+    if (req.io)
+      req.io.emit("biometria:actualizado", {
+        id_biometria: id,
+        estado: "INACTIVO",
+      });
+
+    res.json({ msg: result.msg });
   } catch (error) {
-    console.error(error);
+    console.error("Error en eliminarRegistro:", error);
+    if (error.message === "Registro no encontrado") {
+      return res.status(404).json({ msg: error.message });
+    }
     res.status(500).json({ msg: "Error al desactivar registro" });
   }
 };
@@ -289,29 +126,9 @@ exports.eliminarRegistro = async (req, res) => {
 // --- FUNCIÓN PARA VERIFICAR CONEXIÓN (ÚTIL PARA DEBUG) ---
 exports.verificarConexionMicroservicio = async (req, res) => {
   try {
-    const healthCheck = await axios.get(
-      BIOMETRIC_SERVICE_URL.includes("localhost") 
-        ? "http://localhost:7000/health" 
-        : "https://captura-huellas-microservicio.onrender.com/health",
-      { timeout: 5000 }
-    );
-    
-    res.json({
-      conectado: healthCheck.data === "OK",
-      entorno: BIOMETRIC_SERVICE_URL.includes("localhost") ? "LOCAL" : "RENDER",
-      urlBase: BIOMETRIC_SERVICE_URL,
-      healthCheck: healthCheck.data,
-      mensaje: "✅ Microservicio disponible"
-    });
+    const result = await biometriaService.verificarConexionMicroservicio();
+    res.json(result);
   } catch (error) {
-    res.status(503).json({
-      conectado: false,
-      entorno: BIOMETRIC_SERVICE_URL.includes("localhost") ? "LOCAL" : "RENDER",
-      urlBase: BIOMETRIC_SERVICE_URL,
-      error: error.message,
-      mensaje: BIOMETRIC_SERVICE_URL.includes("localhost") 
-        ? "❌ Microservicio local no responde. Ejecuta: java -jar target\\biometric-service-1.0-SNAPSHOT.jar"
-        : "❌ Microservicio en Render no disponible. Puede estar en 'cold start'."
-    });
+    res.status(503).json(error);
   }
 };

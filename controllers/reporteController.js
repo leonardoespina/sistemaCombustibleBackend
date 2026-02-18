@@ -464,7 +464,7 @@ exports.obtenerReporteCuposUsuario = async (req, res) => {
       return res.status(403).json({ msg: "Usuario inactivo." });
     }
 
-    const { id_dependencia, id_subdependencia } = usuarioBD;
+    const { id_dependencia } = usuarioBD;
 
     console.log(
       `[Reporte Cupos] Usuario: ${id_usuario}, Dep: ${id_dependencia}, Periodo: ${periodoConsulta}`,
@@ -477,15 +477,11 @@ exports.obtenerReporteCuposUsuario = async (req, res) => {
     }
 
     // Construir filtro para CupoBase
+    // CAMBIO SOLICITADO: Mostrar TODOS los cupos de la dependencia,
+    // independientemente de si el usuario tiene subdependencia asignada o no.
     const whereCupoBase = {
       id_dependencia: id_dependencia,
     };
-
-    // Si el usuario tiene subdependencia, filtramos también por ella (más estricto)
-    // Opcional: Si es jefe de dependencia (sin subdependencia), ve todo lo de la dependencia.
-    if (id_subdependencia) {
-      whereCupoBase.id_subdependencia = id_subdependencia;
-    }
 
     const cupos = await CupoActual.findAll({
       where: {
@@ -495,7 +491,7 @@ exports.obtenerReporteCuposUsuario = async (req, res) => {
         {
           model: CupoBase,
           as: "CupoBase",
-          where: whereCupoBase,
+          where: whereCupoBase, // Filtra por dependencia, trayendo todas las subdependencias
           include: [
             { model: Categoria, as: "Categoria", attributes: ["nombre"] },
             {
@@ -517,8 +513,9 @@ exports.obtenerReporteCuposUsuario = async (req, res) => {
         },
       ],
       order: [
-        [sequelize.literal('"CupoBase.Dependencia.nombre_dependencia"'), "ASC"],
-        [sequelize.literal('"CupoBase.Subdependencia.nombre"'), "ASC"],
+        // Ordenar primero por dependencia (aunque es la misma) y luego por subdependencia
+        [sequelize.col("CupoBase.Dependencia.nombre_dependencia"), "ASC"],
+        [sequelize.col("CupoBase.Subdependencia.nombre"), "ASC"],
       ],
     });
 
