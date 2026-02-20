@@ -1,8 +1,11 @@
 const express = require("express");
 const router = express.Router();
 const { check } = require("express-validator");
-const marcaController = require("../controllers/marcaController");
-const { autenticarUsuario, authorizeRole } = require("../middlewares/authMiddleware");
+const marcaController = require("../controllers/vehiculos/marcaController");
+const {
+  autenticarUsuario,
+  authorizeRole,
+} = require("../middlewares/authMiddleware");
 const validarCampos = require("../middlewares/validationMiddleware");
 
 // Todas las rutas de marcas requieren estar logueado
@@ -22,7 +25,7 @@ router.post(
     check("nombre", "El nombre de la marca es obligatorio").not().isEmpty(),
     validarCampos,
   ],
-  marcaController.crearMarca
+  marcaController.crearMarca,
 );
 
 // PUT /api/marcas/:id - Modificar (Solo ADMIN)
@@ -30,20 +33,20 @@ router.put(
   "/:id",
   [
     authorizeRole(["ADMIN"]),
-    check("nombre", "El nombre no puede estar vacío").optional().not().isEmpty(),
+    check("nombre", "El nombre no puede estar vacío")
+      .optional()
+      .not()
+      .isEmpty(),
     validarCampos,
   ],
-  marcaController.actualizarMarca
+  marcaController.actualizarMarca,
 );
 
 // DELETE /api/marcas/:id - Desactivar (Solo ADMIN)
 router.delete(
   "/:id",
-  [
-    authorizeRole(["ADMIN"]),
-    validarCampos
-  ],
-  marcaController.desactivarMarca
+  [authorizeRole(["ADMIN"]), validarCampos],
+  marcaController.desactivarMarca,
 );
 
 module.exports = router;

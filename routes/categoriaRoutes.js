@@ -1,8 +1,11 @@
 const express = require("express");
 const router = express.Router();
 const { check } = require("express-validator");
-const categoriaController = require("../controllers/categoriaController");
-const { autenticarUsuario, authorizeRole } = require("../middlewares/authMiddleware");
+const categoriaController = require("../controllers/organizacion/categoriaController");
+const {
+  autenticarUsuario,
+  authorizeRole,
+} = require("../middlewares/authMiddleware");
 const validarCampos = require("../middlewares/validationMiddleware");
 
 // --- RUTAS PROTEGIDAS (Requieren Token) ---
@@ -11,16 +14,12 @@ const validarCampos = require("../middlewares/validationMiddleware");
 router.get(
   "/jerarquia",
   autenticarUsuario,
-  categoriaController.obtenerJerarquia
+  categoriaController.obtenerJerarquia,
 );
 
 // GET /api/categorias (Listar) - Todos los roles autenticados o solo admin?
 // Asumiremos que cualquier usuario autenticado puede verlas, o restringir a ADMIN/SUPERVISOR
-router.get(
-  "/", 
-  autenticarUsuario, 
-  categoriaController.obtenerCategorias
-);
+router.get("/", autenticarUsuario, categoriaController.obtenerCategorias);
 
 // POST /api/categorias (Crear) - Solo ADMIN
 router.post(
@@ -31,7 +30,7 @@ router.post(
     check("nombre", "El nombre es obligatorio").not().isEmpty(),
     validarCampos,
   ],
-  categoriaController.crearCategoria
+  categoriaController.crearCategoria,
 );
 
 // PUT /api/categorias/:id (Actualizar) - Solo ADMIN
@@ -43,15 +42,15 @@ router.put(
     check("nombre", "El nombre es obligatorio").optional().not().isEmpty(),
     validarCampos,
   ],
-  categoriaController.actualizarCategoria
+  categoriaController.actualizarCategoria,
 );
 
 // DELETE /api/categorias/:id (Desactivar) - Solo ADMIN
 router.delete(
-  "/:id", 
-  autenticarUsuario, 
-  authorizeRole(["ADMIN"]), 
-  categoriaController.desactivarCategoria
+  "/:id",
+  autenticarUsuario,
+  authorizeRole(["ADMIN"]),
+  categoriaController.desactivarCategoria,
 );
 
 module.exports = router;

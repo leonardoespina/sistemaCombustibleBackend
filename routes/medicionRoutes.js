@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const medicionController = require("../controllers/medicionController");
+const medicionController = require("../controllers/operaciones/medicionController");
 const { autenticarUsuario } = require("../middlewares/authMiddleware");
 
 // Todas las rutas requieren autenticación

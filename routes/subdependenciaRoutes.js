@@ -6,15 +6,21 @@ const {
   obtenerSubdependencias,
   actualizarSubdependencia,
   desactivarSubdependencia,
-} = require("../controllers/subdependenciaController");
+} = require("../controllers/organizacion/subdependenciaController");
 const validarCampos = require("../middlewares/validationMiddleware");
 
 // Rutas CRUD para Subdependencia
-router.post("/", [
+router.post(
+  "/",
+  [
     check("nombre", "El nombre es obligatorio").not().isEmpty(),
-    check("id_dependencia", "El ID de la dependencia es obligatorio").not().isEmpty(),
+    check("id_dependencia", "El ID de la dependencia es obligatorio")
+      .not()
+      .isEmpty(),
     validarCampos,
-], crearSubdependencia);
+  ],
+  crearSubdependencia,
+);
 router.get("/", obtenerSubdependencias);
 router.put("/:id", actualizarSubdependencia);
 router.delete("/:id", desactivarSubdependencia);

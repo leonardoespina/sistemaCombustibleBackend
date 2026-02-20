@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const reporteController = require("../controllers/reporteController");
+const reporteController = require("../controllers/administracion/reporteController");
 const { autenticarUsuario } = require("../middlewares/authMiddleware");
 
 // Ruta para generar el reporte diario

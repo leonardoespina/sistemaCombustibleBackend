@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const cargaCisternaController = require("../controllers/cargaCisternaController");
+const cargaCisternaController = require("../controllers/operaciones/cargaCisternaController");
 const { autenticarUsuario } = require("../middlewares/authMiddleware");
 
 // Todas las rutas requieren autenticación

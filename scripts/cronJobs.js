@@ -133,7 +133,7 @@ const initCronJobs = async (io) => {
     async () => {
       console.log("=== INICIANDO REINICIO MENSUAL AUTOMÁTICO (CRON) ===");
       try {
-        const cupoController = require("../controllers/cupoController");
+        const cupoController = require("../controllers/despachos/cupoController");
         const resultado = await cupoController.reiniciarCuposMensuales();
 
         if (resultado.success) {
@@ -189,7 +189,7 @@ const initCronJobs = async (io) => {
       );
       console.log(`🚀 Ejecutando reinicio mensual de recuperación ahora...`);
 
-      const cupoController = require("../controllers/cupoController");
+      const cupoController = require("../controllers/despachos/cupoController");
       const resultado = await cupoController.reiniciarCuposMensuales();
 
       if (resultado.success) {

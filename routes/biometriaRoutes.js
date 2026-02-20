@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const biometriaController = require("../controllers/biometriaController");
+const biometriaController = require("../controllers/despachos/biometriaController");
 const { autenticarUsuario } = require("../middlewares/authMiddleware");
 
 // Todas las rutas de biometría requieren autenticación

@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const validacionController = require("../controllers/validacionController");
+const validacionController = require("../controllers/despachos/validacionController");
 const { autenticarUsuario } = require("../middlewares/authMiddleware");
 
 // Todas las rutas requieren autenticación

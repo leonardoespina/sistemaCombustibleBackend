@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const despachoController = require("../controllers/despachoController");
+const despachoController = require("../controllers/despachos/despachoController");
 const { autenticarUsuario } = require("../middlewares/authMiddleware");
 
 // Todas las rutas requieren autenticación

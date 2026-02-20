@@ -1,8 +1,11 @@
 const express = require("express");
 const router = express.Router();
 const { check } = require("express-validator");
-const modeloController = require("../controllers/modeloController");
-const { autenticarUsuario, authorizeRole } = require("../middlewares/authMiddleware");
+const modeloController = require("../controllers/vehiculos/modeloController");
+const {
+  autenticarUsuario,
+  authorizeRole,
+} = require("../middlewares/authMiddleware");
 const validarCampos = require("../middlewares/validationMiddleware");
 
 // Todas las rutas de modelos requieren estar autenticado
@@ -18,10 +21,13 @@ router.post(
   [
     authorizeRole(["ADMIN"]),
     check("nombre", "El nombre es obligatorio").not().isEmpty(),
-    check("id_marca", "El ID de la marca es obligatorio y numérico").isNumeric(),
+    check(
+      "id_marca",
+      "El ID de la marca es obligatorio y numérico",
+    ).isNumeric(),
     validarCampos,
   ],
-  modeloController.crearModelo
+  modeloController.crearModelo,
 );
 
 // PUT /api/modelos/:id (Actualizar) - Solo ADMIN
@@ -29,21 +35,21 @@ router.put(
   "/:id",
   [
     authorizeRole(["ADMIN"]),
-    check("nombre", "El nombre no puede estar vacío").optional().not().isEmpty(),
+    check("nombre", "El nombre no puede estar vacío")
+      .optional()
+      .not()
+      .isEmpty(),
     check("id_marca", "ID de marca inválido").optional().isNumeric(),
     validarCampos,
   ],
-  modeloController.actualizarModelo
+  modeloController.actualizarModelo,
 );
 
 // DELETE /api/modelos/:id (Desactivar) - Solo ADMIN
 router.delete(
   "/:id",
-  [
-    authorizeRole(["ADMIN"]),
-    validarCampos
-  ],
-  modeloController.desactivarModelo
+  [authorizeRole(["ADMIN"]), validarCampos],
+  modeloController.desactivarModelo,
 );
 
 module.exports = router;

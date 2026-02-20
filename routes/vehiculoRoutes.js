@@ -1,8 +1,11 @@
 const express = require("express");
 const router = express.Router();
 const { check } = require("express-validator");
-const vehiculoController = require("../controllers/vehiculoController");
-const { autenticarUsuario, authorizeRole } = require("../middlewares/authMiddleware");
+const vehiculoController = require("../controllers/vehiculos/vehiculoController");
+const {
+  autenticarUsuario,
+  authorizeRole,
+} = require("../middlewares/authMiddleware");
 const validarCampos = require("../middlewares/validationMiddleware");
 
 // Todas las rutas de vehículos requieren estar logueado
@@ -15,24 +18,32 @@ router.get("/", vehiculoController.obtenerVehiculos);
 router.get("/lista", vehiculoController.obtenerListaVehiculos);
 
 // GET /api/vehiculos/listas/modelos/:id_marca - Para dropdowns dependientes
-router.get("/listas/modelos/:id_marca", vehiculoController.obtenerModelosPorMarca);
+router.get(
+  "/listas/modelos/:id_marca",
+  vehiculoController.obtenerModelosPorMarca,
+);
 
 // POST /api/vehiculos - Crear (Solo ADMIN)
 router.post(
   "/",
   [
     authorizeRole(["ADMIN"]),
-    
+
     check("id_marca", "La marca es obligatoria").isNumeric(),
     check("id_modelo", "El modelo es obligatorio").isNumeric(),
     check("id_categoria", "La categoría es obligatoria").isNumeric(),
     check("id_dependencia", "La dependencia es obligatoria").isNumeric(),
-    check("id_subdependencia", "El ID de subdependencia debe ser numérico").optional({ nullable: true }).isNumeric(),
-    check("id_tipo_combustible", "El tipo de combustible es obligatorio").isNumeric(),
+    check("id_subdependencia", "El ID de subdependencia debe ser numérico")
+      .optional({ nullable: true })
+      .isNumeric(),
+    check(
+      "id_tipo_combustible",
+      "El tipo de combustible es obligatorio",
+    ).isNumeric(),
     check("es_generador").optional().isBoolean(),
     validarCampos,
   ],
-  vehiculoController.crearVehiculo
+  vehiculoController.crearVehiculo,
 );
 
 // PUT /api/vehiculos/:id - Modificar (Solo ADMIN)
@@ -41,23 +52,26 @@ router.put(
   [
     authorizeRole(["ADMIN"]),
     check("placa", "La placa no puede estar vacía").optional().not().isEmpty(),
-    check("id_categoria", "El ID de categoría debe ser numérico").optional().isNumeric(),
-    check("id_dependencia", "El ID de dependencia debe ser numérico").optional().isNumeric(),
-    check("id_tipo_combustible", "El ID de tipo combustible debe ser numérico").optional().isNumeric(),
+    check("id_categoria", "El ID de categoría debe ser numérico")
+      .optional()
+      .isNumeric(),
+    check("id_dependencia", "El ID de dependencia debe ser numérico")
+      .optional()
+      .isNumeric(),
+    check("id_tipo_combustible", "El ID de tipo combustible debe ser numérico")
+      .optional()
+      .isNumeric(),
     check("es_generador").optional().isBoolean(),
     validarCampos,
   ],
-  vehiculoController.actualizarVehiculo
+  vehiculoController.actualizarVehiculo,
 );
 
 // DELETE /api/vehiculos/:id - Desactivar (Solo ADMIN)
 router.delete(
   "/:id",
-  [
-    authorizeRole(["ADMIN"]),
-    validarCampos
-  ],
-  vehiculoController.desactivarVehiculo
+  [authorizeRole(["ADMIN"]), validarCampos],
+  vehiculoController.desactivarVehiculo,
 );
 
 module.exports = router;
