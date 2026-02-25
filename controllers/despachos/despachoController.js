@@ -19,13 +19,14 @@ exports.listarSolicitudesParaDespacho = async (req, res) => {
  * Validar Firma Biométrica
  */
 exports.validarFirma = async (req, res) => {
-  const { cedula, huella, id_solicitud } = req.body;
+  const { cedula, huella, id_solicitud, validar_pertenencia } = req.body;
 
   try {
     const result = await despachoService.validarFirma(
       cedula,
       huella,
       id_solicitud,
+      validar_pertenencia === true,
     );
     res.json(result);
   } catch (error) {
@@ -38,6 +39,13 @@ exports.validarFirma = async (req, res) => {
     }
     if (error.message === "Solicitud no encontrada.") {
       return res.status(404).json({ msg: error.message });
+    }
+    if (
+      error.message.includes("no coincide con el usuario") ||
+      error.message.includes("no pertenece a la dependencia") ||
+      error.message.includes("no pertenece a la subdependencia")
+    ) {
+      return res.status(403).json({ msg: error.message });
     }
     if (error.message.includes("no tiene roles")) {
       return res.status(403).json({ msg: error.message });

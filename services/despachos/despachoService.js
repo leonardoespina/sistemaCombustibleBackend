@@ -77,7 +77,7 @@ exports.listarSolicitudesParaDespacho = async (query) => {
 /**
  * Validar Firma Biométrica
  */
-exports.validarFirma = async (cedula, huella, id_solicitud) => {
+exports.validarFirma = async (cedula, huella, id_solicitud, validar_pertenencia = false) => {
   if (!cedula || !huella || !id_solicitud) {
     throw new Error("Faltan datos requeridos (cédula, huella, id_solicitud).");
   }
@@ -112,14 +112,18 @@ exports.validarFirma = async (cedula, huella, id_solicitud) => {
     );
   }
 
-  // Validar Pertenencia (Informativo - se podría lanzar error si se requiere estricto)
-  if (
-    registro.rol === "RETIRO" &&
-    registro.id_subdependencia !== solicitud.id_subdependencia
-  ) {
-    console.warn(
-      "Aviso: El receptor no pertenece a la misma subdependencia, pero tiene rol de retiro válido.",
-    );
+  // Validar Pertenencia estricta (dependencia + subdependencia) — solo para el Solicitante
+  if (validar_pertenencia && (registro.rol === "RETIRO" || registro.rol === "AMBOS")) {
+    if (registro.id_dependencia !== solicitud.id_dependencia) {
+      throw new Error(
+        "El receptor no pertenece a la dependencia de la solicitud.",
+      );
+    }
+    if (registro.id_subdependencia !== solicitud.id_subdependencia) {
+      throw new Error(
+        "El receptor no pertenece a la subdependencia de la solicitud.",
+      );
+    }
   }
 
   return {

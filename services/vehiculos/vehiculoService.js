@@ -105,7 +105,7 @@ exports.obtenerVehiculos = async (query, user) => {
     estado,
   } = query;
 
-  const searchableFields = ["placa", "color"];
+  const searchableFields = ["placa"];
   const where = {};
 
   if (id_categoria) where.id_categoria = id_categoria;

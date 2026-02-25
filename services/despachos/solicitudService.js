@@ -48,37 +48,49 @@ exports.createSolicitud = async (data, user, clientIp) => {
       id_categoria,
     } = data;
 
-    // Validación de placa
-    if (!placa) {
-      throw new Error("La placa del vehículo es requerida");
-    }
-
     // Validación de cantidad positiva
     if (!cantidad_litros || parseFloat(cantidad_litros) <= 0) {
       throw new Error("La cantidad de litros debe ser mayor a cero");
     }
 
-    // Validar Bloqueo de Placa (RF-05)
-    const solicitudActiva = await Solicitud.findOne({
-      where: {
-        placa,
-        estado: {
-          [Op.in]: [
-            ESTADOS_SOLICITUD.PENDIENTE,
-            ESTADOS_SOLICITUD.APROBADA,
-            ESTADOS_SOLICITUD.IMPRESA,
-          ],
-        },
-      },
-      transaction: t,
-    });
+    // --- Normalizar datos según tipo de suministro ---
+    // Vehículo se omite SOLO cuando es BIDÓN + VENTA
+    const esBidon =
+      tipo_suministro === TIPOS_SUMINISTRO.BIDON &&
+      tipo_solicitud === TIPOS_SOLICITUD.VENTA;
 
-    if (solicitudActiva) {
-      throw new Error(
-        `El vehículo ${placa} ya tiene una solicitud activa (Ticket: ${
-          solicitudActiva.codigo_ticket || "Pendiente"
-        }).`,
-      );
+    const placaFinal = esBidon ? "NO APLICA" : placa;
+    const marcaFinal = esBidon ? "NO APLICA" : marca;
+    const modeloFinal = esBidon ? "NO APLICA" : modelo;
+    const idVehiculoFinal = esBidon ? null : id_vehiculo;
+
+    // Validar placa presente para solicitudes REGULAR
+    if (!esBidon && !placa) {
+      throw new Error("La placa del vehículo es requerida");
+    }
+
+    // Validar Bloqueo de Placa (RF-05) — Solo aplica a solicitudes REGULAR
+    if (!esBidon) {
+      const solicitudActiva = await Solicitud.findOne({
+        where: {
+          placa: placaFinal,
+          estado: {
+            [Op.in]: [
+              ESTADOS_SOLICITUD.PENDIENTE,
+              ESTADOS_SOLICITUD.APROBADA,
+              ESTADOS_SOLICITUD.IMPRESA,
+            ],
+          },
+        },
+        transaction: t,
+      });
+
+      if (solicitudActiva) {
+        throw new Error(
+          `El vehículo ${placaFinal} ya tiene una solicitud activa (Ticket: ${solicitudActiva.codigo_ticket || "Pendiente"
+          }).`,
+        );
+      }
     }
 
     // Validar Cupo y Reservar (RF-04, RF-06)
@@ -183,11 +195,11 @@ exports.createSolicitud = async (data, user, clientIp) => {
         id_dependencia,
         id_subdependencia,
         id_categoria,
-        id_vehiculo,
-        placa,
-        marca,
-        modelo,
-        flota,
+        id_vehiculo: idVehiculoFinal,
+        placa: placaFinal,
+        marca: marcaFinal,
+        modelo: modeloFinal,
+        flota: esBidon ? null : flota,
         id_llenadero,
         id_tipo_combustible,
         cantidad_litros: parseFloat(cantidad_litros),

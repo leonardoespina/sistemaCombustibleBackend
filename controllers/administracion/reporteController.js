@@ -17,13 +17,27 @@ const { Op } = require("sequelize");
 const sequelize = require("sequelize");
 const { paginate } = require("../../helpers/paginationHelper");
 
+/**
+ * Helper: Formatea datos de vehículo según tipo_suministro.
+ * - BIDÓN: muestra etiqueta fija (no hay vehículo asociado).
+ * - REGULAR/otros: usa el JOIN con Vehiculo y, como respaldo, el snapshot guardado en la solicitud.
+ */
+function formatVehiculo(solicitud) {
+  if (solicitud.tipo_suministro === 'BIDON') {
+    return { vehiculo: 'BIDÓN', placa: 'NO APLICA' };
+  }
+  const marca = solicitud.Vehiculo?.Marca?.nombre || solicitud.marca || '';
+  const modelo = solicitud.Vehiculo?.Modelo?.nombre || solicitud.modelo || '';
+  return {
+    vehiculo: `${marca} ${modelo}`.trim() || 'Desconocido',
+    placa: solicitud.Vehiculo?.placa || solicitud.placa || 'S/P',
+  };
+}
+
 exports.generarReporteDiario = async (req, res) => {
   try {
     const { id_llenadero, fecha } = req.query;
 
-    console.log(
-      `[DEBUG] Generando reporte diario - Llenadero: ${id_llenadero}, Fecha: ${fecha}`,
-    );
 
     if (!id_llenadero || !fecha) {
       return res
@@ -51,7 +65,6 @@ exports.generarReporteDiario = async (req, res) => {
       estado: "FINALIZADA",
     };
 
-    console.log("[DEBUG] Filtros SQL Ajustados:", JSON.stringify(whereBase));
 
     // --- CONSULTAS PARA TOTALES (No paginadas) ---
     // Necesitamos el total del día independientemente de la página que estemos viendo
@@ -78,6 +91,7 @@ exports.generarReporteDiario = async (req, res) => {
         },
         {
           model: Vehiculo,
+          required: false,
           attributes: ["placa"],
           include: [
             { model: Marca, as: "Marca", attributes: ["nombre"] },
@@ -108,6 +122,10 @@ exports.generarReporteDiario = async (req, res) => {
         "monto_total",
         "precio_unitario",
         "tipo_solicitud",
+        "tipo_suministro",
+        "placa",
+        "marca",
+        "modelo",
       ],
       order: [["id_solicitud", "ASC"]],
     });
@@ -145,14 +163,13 @@ exports.generarReporteDiario = async (req, res) => {
         fecha: f,
         hora: f
           ? new Date(f).toLocaleTimeString("es-VE", {
-              hour: "2-digit",
-              minute: "2-digit",
-              hour12: true,
-            })
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+          })
           : "",
         solicitante: `${v.Solicitante?.nombre} ${v.Solicitante?.apellido}`,
-        vehiculo: `${v.Vehiculo?.Marca?.nombre} ${v.Vehiculo?.Modelo?.nombre}`,
-        placa: v.Vehiculo?.placa,
+        ...formatVehiculo(v),
         dependencia: v.Dependencia?.nombre_dependencia,
         subdependencia: v.Subdependencia?.nombre,
         cant_solic: v.cantidad_litros,
@@ -181,15 +198,13 @@ exports.generarReporteDiario = async (req, res) => {
           fecha: f,
           hora: f
             ? new Date(f).toLocaleTimeString("es-VE", {
-                hour: "2-digit",
-                minute: "2-digit",
-                hour12: true,
-              })
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: true,
+            })
             : "",
           solicitante: `${i.Solicitante?.nombre} ${i.Solicitante?.apellido}`,
-          vehiculo:
-            `${i.Vehiculo?.Marca?.nombre || ""} ${i.Vehiculo?.Modelo?.nombre || ""}`.trim(),
-          placa: i.Vehiculo?.placa,
+          ...formatVehiculo(i),
           dependencia: i.Dependencia?.nombre_dependencia,
           subdependencia: i.Subdependencia?.nombre,
           cant_solic: i.cantidad_litros,
@@ -232,8 +247,6 @@ exports.consultarDespachos = async (req, res) => {
       fecha_hasta,
     } = req.query;
 
-    console.log("[DEBUG REPORTES] Filtros recibidos:", req.query);
-
     if (!fecha_desde || !fecha_hasta) {
       return res
         .status(400)
@@ -273,10 +286,6 @@ exports.consultarDespachos = async (req, res) => {
       },
     ];
 
-    console.log(
-      "[DEBUG REPORTES] Where Clause:",
-      JSON.stringify(where, null, 2),
-    );
 
     // Usar el helper de paginación
     const result = await paginate(Solicitud, req.query, {
@@ -284,6 +293,7 @@ exports.consultarDespachos = async (req, res) => {
       include: [
         {
           model: Vehiculo,
+          required: false,
           attributes: ["placa"],
           include: [
             { model: Marca, as: "Marca", attributes: ["nombre"] },
@@ -308,6 +318,10 @@ exports.consultarDespachos = async (req, res) => {
         "fecha_validacion",
         "cantidad_litros",
         "cantidad_despachada",
+        "tipo_suministro",
+        "placa",
+        "marca",
+        "modelo",
       ],
       order: [["fecha_validacion", "ASC"]],
     });
@@ -326,15 +340,12 @@ exports.consultarDespachos = async (req, res) => {
         fecha: f,
         hora: f
           ? new Date(f).toLocaleTimeString("es-VE", {
-              hour: "2-digit",
-              minute: "2-digit",
-              hour12: true,
-            })
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+          })
           : "",
-        vehiculo:
-          `${d.Vehiculo?.Marca?.nombre || ""} ${d.Vehiculo?.Modelo?.nombre || ""}`.trim() ||
-          "Desconocido",
-        placa: d.Vehiculo?.placa,
+        ...formatVehiculo(d),
         dependencia: d.Dependencia?.nombre_dependencia,
         subdependencia: d.Subdependencia?.nombre,
         solicitante: `${d.Solicitante?.nombre} ${d.Solicitante?.apellido}`,

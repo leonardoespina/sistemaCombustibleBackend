@@ -33,12 +33,14 @@ const Solicitud = sequelize.define(
     },
     id_vehiculo: {
       type: DataTypes.INTEGER,
-      allowNull: false,
+      allowNull: true,
+      comment: "Null para solicitudes BIDÓN",
     },
     // Snapshot de datos del vehículo
     placa: {
       type: DataTypes.STRING(20),
-      allowNull: false,
+      allowNull: true,
+      comment: "'NO APLICA' para solicitudes BIDÓN",
     },
     marca: {
       type: DataTypes.STRING(50),
