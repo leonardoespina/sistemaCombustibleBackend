@@ -29,6 +29,7 @@ exports.obtenerTiposCombustible = async (req, res) => {
   try {
     const result = await tipoCombustibleService.obtenerTiposCombustible(
       req.query,
+      req.usuario,
     );
     res.json(result);
   } catch (error) {

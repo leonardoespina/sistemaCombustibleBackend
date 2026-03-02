@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const solicitudController = require("../controllers/despachos/solicitudController");
-const { autenticarUsuario } = require("../middlewares/authMiddleware");
+const { autenticarUsuario,  authorizeRole } = require("../middlewares/authMiddleware");
 const { criticalLimiter } = require("../middlewares/rateLimitMiddleware");
 
 // Todas las rutas requieren autenticación
@@ -30,13 +30,23 @@ router.get("/", solicitudController.listarSolicitudes);
 router.put(
   "/:id/aprobar",
   criticalLimiter,
+  authorizeRole(["ADMIN","GERENTE", "JEFE DIVISION"]), // Middleware de autorización por rol
   solicitudController.aprobarSolicitud,
 );
+
+/*   "ADMIN",
+        "GERENTE",
+        "JEFE DIVISION",
+        "SUPERVISOR",
+        "COORDINADOR",
+        "INSPECTOR",
+        "ALMACENISTA", */
 
 // Rechazar (Anular) Solicitud - OPERACIÓN CRÍTICA
 router.put(
   "/:id/rechazar",
   criticalLimiter,
+  authorizeRole(["ADMIN","GERENTE", "JEFE DIVISION"]),
   solicitudController.rechazarSolicitud,
 );
 

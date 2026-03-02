@@ -42,7 +42,7 @@ const Dependencia = sequelize.define(
       defaultValue: "ACTIVO",
     },
     tipo_acceso_menu: {
-      type: DataTypes.ENUM("ESTANDAR", "SEGURIDAD", "ALMACEN", "OPERACIONES"),
+      type: DataTypes.ENUM("ESTANDAR", "SEGURIDAD", "ALMACEN", "PRESIDENCIA"),
       defaultValue: "ESTANDAR",
       allowNull: false,
     },

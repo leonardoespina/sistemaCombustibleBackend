@@ -89,14 +89,14 @@ exports.desactivarSubdependencia = async (req, res) => {
     if (req.io)
       req.io.emit("subdependencia:actualizado", result.subdependencia);
 
-    res.json({ msg: result.msg });
+    res.json({ msg: result.msg, estatus: result.estatus });
   } catch (error) {
     console.error(error);
     if (error.message === "Subdependencia no encontrada") {
       return res.status(404).json({ msg: error.message });
     }
     if (!res.headersSent) {
-      res.status(500).json({ msg: "Error al desactivar" });
+      res.status(500).json({ msg: "Error al cambiar estado de la subdependencia" });
     }
   }
 };

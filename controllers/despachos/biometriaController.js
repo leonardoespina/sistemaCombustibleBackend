@@ -93,7 +93,7 @@ exports.verificarIdentidad = async (req, res) => {
 // --- OBTENER REGISTROS (CRUD) ---
 exports.obtenerRegistros = async (req, res) => {
   try {
-    const results = await biometriaService.obtenerRegistros(req.query);
+    const results = await biometriaService.obtenerRegistros(req.query, req.usuario);
     res.json(results);
   } catch (error) {
     console.error("Error en obtenerRegistros:", error);
@@ -110,16 +110,16 @@ exports.eliminarRegistro = async (req, res) => {
     if (req.io)
       req.io.emit("biometria:actualizado", {
         id_biometria: id,
-        estado: "INACTIVO",
+        estado: result.estado,
       });
 
-    res.json({ msg: result.msg });
+    res.json({ msg: result.msg, estado: result.estado });
   } catch (error) {
     console.error("Error en eliminarRegistro:", error);
     if (error.message === "Registro no encontrado") {
       return res.status(404).json({ msg: error.message });
     }
-    res.status(500).json({ msg: "Error al desactivar registro" });
+    res.status(500).json({ msg: "Error al cambiar estado del registro" });
   }
 };
 

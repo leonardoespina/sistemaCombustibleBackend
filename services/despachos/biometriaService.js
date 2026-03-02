@@ -62,7 +62,6 @@ exports.registrarBiometria = async (data, clientIp) => {
         }
       }
 
-      // Actualizar datos básicos
       const updateData = {
         cedula,
         nombre,
@@ -72,6 +71,11 @@ exports.registrarBiometria = async (data, clientIp) => {
         id_subdependencia,
         fecha_modificacion: new Date(),
       };
+
+      // Permitir cambiar estado (activar/desactivar) en la edición
+      if (data.estado !== undefined) {
+        updateData.estado = data.estado;
+      }
 
       // Actualizar huellas SOLO si se enviaron nuevas
       if (huellas && huellas.length > 0) {
@@ -245,9 +249,14 @@ exports.verificarIdentidad = async (cedula, muestraActual) => {
 /**
  * Obtener listado de registros paginados
  */
-exports.obtenerRegistros = async (query) => {
+exports.obtenerRegistros = async (query, user) => {
   const searchableFields = ["nombre", "cedula"];
-  const where = { estado: "ACTIVO" };
+  const where = {};
+
+  // Solo ADMIN puede ver los registros desactivados
+  if (!user || user.tipo_usuario !== "ADMIN") {
+    where.estado = "ACTIVO";
+  }
 
   return await paginate(Biometria, query, {
     where,
@@ -271,12 +280,17 @@ exports.eliminarRegistro = async (id) => {
   const registro = await Biometria.findByPk(id);
   if (!registro) throw new Error("Registro no encontrado");
 
-  await registro.update({ estado: "INACTIVO", fecha_modificacion: new Date() });
+  // Toggle: si está ACTIVO lo desactiva, si está INACTIVO lo reactiva
+  const nuevoEstado = registro.estado === "ACTIVO" ? "INACTIVO" : "ACTIVO";
+
+  await registro.update({ estado: nuevoEstado, fecha_modificacion: new Date() });
 
   return {
     id_biometria: id,
-    estado: "INACTIVO",
-    msg: "Registro biométrico desactivado",
+    estado: nuevoEstado,
+    msg: nuevoEstado === "INACTIVO"
+      ? "Registro biométrico desactivado"
+      : "Registro biométrico reactivado",
   };
 };
 

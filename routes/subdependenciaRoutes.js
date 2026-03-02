@@ -8,6 +8,10 @@ const {
   desactivarSubdependencia,
 } = require("../controllers/organizacion/subdependenciaController");
 const validarCampos = require("../middlewares/validationMiddleware");
+const { autenticarUsuario } = require("../middlewares/authMiddleware");
+
+// Todas las rutas requieren autenticación para obtener req.usuario
+router.use(autenticarUsuario);
 
 // Rutas CRUD para Subdependencia
 router.post(

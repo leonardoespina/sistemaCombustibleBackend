@@ -54,10 +54,7 @@ exports.createSolicitud = async (data, user, clientIp) => {
     }
 
     // --- Normalizar datos según tipo de suministro ---
-    // Vehículo se omite SOLO cuando es BIDÓN + VENTA
-    const esBidon =
-      tipo_suministro === TIPOS_SUMINISTRO.BIDON &&
-      tipo_solicitud === TIPOS_SOLICITUD.VENTA;
+    const esBidon = tipo_suministro === TIPOS_SUMINISTRO.BIDON;
 
     const placaFinal = esBidon ? "NO APLICA" : placa;
     const marcaFinal = esBidon ? "NO APLICA" : marca;
@@ -343,11 +340,17 @@ exports.listarSolicitudes = async (query, user) => {
     where.id_usuario = id_usuario;
   }
 
-  if (
-    tipo_usuario === "GERENTE" ||
-    tipo_usuario === "JEFE DIVISION" ||
-    tipo_usuario === "ALMACENISTA"
-  ) {
+  // Todos los roles (excepto ADMIN y SOLICITANTE) filtran por su dependencia
+  const ROLES_FILTRAN_POR_DEPENDENCIA = [
+    "GERENTE",
+    "JEFE DIVISION",
+    "ALMACENISTA",
+    "SUPERVISOR",
+    "COORDINADOR",
+    "INSPECTOR",
+  ];
+
+  if (ROLES_FILTRAN_POR_DEPENDENCIA.includes(tipo_usuario)) {
     if (id_dependencia) {
       where.id_dependencia = id_dependencia;
     }
@@ -377,7 +380,7 @@ exports.listarSolicitudes = async (query, user) => {
         attributes: ["nombre_dependencia", "codigo"],
       },
       { model: Subdependencia, as: "Subdependencia", attributes: ["nombre"] },
-      { model: TipoCombustible, attributes: ["nombre"] },
+      { model: TipoCombustible, attributes: ["nombre"], where: { activo: true }, required: false },
       { model: Llenadero, attributes: ["nombre_llenadero"] },
     ],
     order: [["fecha_solicitud", "DESC"]],

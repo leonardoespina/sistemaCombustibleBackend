@@ -142,10 +142,12 @@ app.use((req, res, next) => {
 // ============================================================
 // RATE LIMITING - Protección contra abuso de API
 // ============================================================
-const { apiLimiter } = require("./middlewares/rateLimitMiddleware");
+const { ddosLimiter } = require("./middlewares/rateLimitMiddleware");
 
-// Aplicar rate limiting general a toda la API
-app.use("/api/", apiLimiter);
+// Protección anti-DDoS por IP (muy permisiva — NO bloquea usuarios legítimos).
+// Los limiters por usuario (apiLimiter, criticalLimiter) se aplican DENTRO de
+// cada ruta, después de autenticarUsuario, donde req.usuario ya está disponible.
+app.use("/api/", ddosLimiter);
 
 // ============================================================
 // 3. RUTAS

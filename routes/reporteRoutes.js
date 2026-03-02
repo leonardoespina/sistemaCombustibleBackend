@@ -19,6 +19,14 @@ router.get(
   reporteController.consultarDespachos,
 );
 
+// Ruta para que el usuario vea sus propios despachos (la dependencia viene del token)
+// GET /api/reportes/mis-despachos?subdependencias[]=1&subdependencias[]=2&fecha_desde=...&fecha_hasta=...
+router.get(
+  "/mis-despachos",
+  autenticarUsuario,
+  reporteController.consultarMisDespachos,
+);
+
 // Ruta para el reporte de consumo agregado por dependencia y tipo de combustible
 // GET /api/reportes/consumo-dependencia?fecha_desde=...&fecha_hasta=...
 router.get(

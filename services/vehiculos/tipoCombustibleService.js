@@ -35,9 +35,14 @@ exports.crearTipoCombustible = async (data, clientIp) => {
 /**
  * Obtener Tipos de Combustible (Paginado)
  */
-exports.obtenerTiposCombustible = async (query) => {
+exports.obtenerTiposCombustible = async (query, user) => {
   const searchableFields = ["nombre", "descripcion"];
   const where = {};
+
+  // Solo ADMIN puede ver desactivados
+  if (!user || user.tipo_usuario !== "ADMIN") {
+    where.activo = true;
+  }
 
   return await paginate(TipoCombustible, query, {
     searchableFields,

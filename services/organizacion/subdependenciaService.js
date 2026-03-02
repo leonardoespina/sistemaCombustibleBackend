@@ -134,9 +134,11 @@ exports.obtenerSubdependencias = async (query, user) => {
   ];
 
   const where = {};
+  console.log(`[DEBUG subdep] tipo_usuario="${user?.tipo_usuario}" → where:`, JSON.stringify(where));
   if (!user || user.tipo_usuario !== "ADMIN") {
     where.estatus = "ACTIVO";
   }
+  console.log(`[DEBUG subdep] where final:`, JSON.stringify(where));
 
   return await paginate(Subdependencia, query, {
     searchableFields,
@@ -228,21 +230,21 @@ exports.actualizarSubdependencia = async (id, data, clientIp) => {
  */
 exports.desactivarSubdependencia = async (id, clientIp) => {
   return await executeTransaction(clientIp, async (t) => {
-    const subdependencia = await Subdependencia.findByPk(id, {
-      transaction: t,
-    });
-    if (!subdependencia) {
-      throw new Error("Subdependencia no encontrada");
-    }
+    const subdependencia = await Subdependencia.findByPk(id, { transaction: t });
+    if (!subdependencia) throw new Error("Subdependencia no encontrada");
+
+    // Toggle: ACTIVO → INACTIVO / INACTIVO → ACTIVO
+    const nuevoEstatus = subdependencia.estatus === "ACTIVO" ? "INACTIVO" : "ACTIVO";
 
     await subdependencia.update(
-      { estatus: "INACTIVO", fecha_modificacion: new Date() },
+      { estatus: nuevoEstatus, fecha_modificacion: new Date() },
       { transaction: t },
     );
 
     return {
-      msg: "Subdependencia desactivada",
+      msg: nuevoEstatus === "INACTIVO" ? "Subdependencia desactivada" : "Subdependencia reactivada",
       subdependencia,
+      estatus: nuevoEstatus,
     };
   });
 };

@@ -25,7 +25,7 @@ exports.consultarTicket = async (codigo) => {
         attributes: ["nombre_dependencia", "codigo"],
       },
       { model: Subdependencia, as: "Subdependencia", attributes: ["nombre"] },
-      { model: TipoCombustible, attributes: ["nombre"] },
+      { model: TipoCombustible, attributes: ["nombre"], where: { activo: true }, required: false },
       { model: Llenadero, attributes: ["nombre_llenadero"] },
       {
         model: Usuario,

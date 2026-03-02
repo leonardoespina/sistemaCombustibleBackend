@@ -68,7 +68,10 @@ exports.loginUsuario = async (data, activeSocketsMap) => {
 
   const usuario = await Usuario.findOne({
     where: { cedula },
-    include: [{ model: Dependencia, as: "Dependencia" }],
+    include: [
+      { model: Dependencia, as: "Dependencia" },
+      { model: Subdependencia, as: "Subdependencia" }
+    ],
   });
 
   if (!usuario) {
@@ -78,6 +81,21 @@ exports.loginUsuario = async (data, activeSocketsMap) => {
     const error = new Error("Usuario Inactivo");
     error.status = 403;
     throw error;
+  }
+
+  // Verificar si la dependencia o subdependencia están inactivas (Solo para NO administradores)
+  if (usuario.tipo_usuario !== "ADMIN") {
+    if (usuario.Dependencia && usuario.Dependencia.estatus !== "ACTIVO") {
+      const error = new Error("Acceso denegado: La Dependencia asociada está inactiva.");
+      error.status = 403;
+      throw error;
+    }
+
+    if (usuario.Subdependencia && usuario.Subdependencia.estatus !== "ACTIVO") {
+      const error = new Error("Acceso denegado: La Subdependencia asociada está inactiva.");
+      error.status = 403;
+      throw error;
+    }
   }
 
   const isMatch = await bcrypt.compare(password, usuario.password);

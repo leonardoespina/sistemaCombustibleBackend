@@ -67,7 +67,7 @@ exports.listarSolicitudesParaDespacho = async (query) => {
         attributes: ["nombre_dependencia", "codigo"],
       },
       { model: Subdependencia, as: "Subdependencia", attributes: ["nombre"] },
-      { model: TipoCombustible, attributes: ["nombre"] },
+      { model: TipoCombustible, attributes: ["nombre"], where: { activo: true }, required: false },
       { model: Llenadero, attributes: ["nombre_llenadero"] },
     ],
     order,
@@ -241,7 +241,7 @@ exports.imprimirTicket = async (data, user, clientIp) => {
           attributes: ["nombre", "apellido"],
         },
         { model: Usuario, as: "Aprobador", attributes: ["nombre", "apellido"] },
-        { model: TipoCombustible, attributes: ["nombre"] },
+        { model: TipoCombustible, attributes: ["nombre"], where: { activo: true }, required: false },
         { model: Llenadero, attributes: ["nombre_llenadero"] },
         {
           model: PrecioCombustible,
@@ -281,7 +281,7 @@ exports.reimprimirTicket = async (id_solicitud) => {
         attributes: ["nombre", "apellido"],
       },
       { model: Biometria, as: "Receptor" },
-      { model: TipoCombustible, attributes: ["nombre"] },
+      { model: TipoCombustible, attributes: ["nombre"], where: { activo: true }, required: false },
       { model: Llenadero, attributes: ["nombre_llenadero"] },
       {
         model: PrecioCombustible,

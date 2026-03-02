@@ -34,27 +34,28 @@ exports.loginUsuario = async (req, res) => {
       req.body,
       req.io?.activeSockets,
     );
-
     const { token, usuario } = result;
-
     res.json({ msg: "Login OK", token, usuario });
   } catch (error) {
-    console.error(error);
+    // Errores de negocio esperados → solo el mensaje, sin stack
     if (error.status === 409) {
-      return res.status(409).json({
-        msg: error.message,
-        sesion_activa: error.sesion_activa,
-      });
+      console.warn(`⚠️  Sesión activa: ${req.body?.cedula}`);
+      return res.status(409).json({ msg: error.message, sesion_activa: error.sesion_activa });
     }
     if (error.status === 403) {
+      console.warn(`⚠️  Acceso denegado (inactivo/bloqueado): ${req.body?.cedula}`);
       return res.status(403).json({ msg: error.message });
     }
-    if (error.message.includes("incorrectas")) {
+    if (error.message?.includes("incorrectas")) {
+      console.warn(`⚠️  Credenciales incorrectas: ${req.body?.cedula}`);
       return res.status(400).json({ msg: error.message });
     }
+    // Error inesperado → stack trace completo
+    console.error("Error inesperado en login:", error);
     res.status(500).json({ msg: "Error en el login" });
   }
 };
+
 
 // --- LOGOUT (Privado) ---
 exports.logoutUsuario = async (req, res) => {
