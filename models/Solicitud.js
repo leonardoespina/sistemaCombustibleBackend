@@ -81,6 +81,12 @@ const Solicitud = sequelize.define(
       allowNull: false,
       // defaultValue: "INSTITUCIONAL",
     },
+    // Cierre de Turno (Lote)
+    id_cierre_turno: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      comment: "FK a CierreTurno. null = pendiente de asignar al próximo lote de cierre",
+    },
     // Datos para Venta
     id_precio: {
       type: DataTypes.INTEGER,
@@ -200,6 +206,9 @@ Solicitud.associate = (models) => {
 
   // Relación opcional con PrecioCombustible (para ventas)
   Solicitud.belongsTo(models.PrecioCombustible, { foreignKey: "id_precio" });
+
+  // Cierre de Turno (lote al que pertenece el despacho)
+  Solicitud.belongsTo(models.CierreTurno, { foreignKey: "id_cierre_turno", as: "CierreTurno" });
 };
 
 module.exports = Solicitud;

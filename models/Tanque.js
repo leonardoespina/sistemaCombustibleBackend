@@ -49,12 +49,12 @@ const Tanque = sequelize.define(
       allowNull: true,
     },
     unidad_medida: {
-      type: DataTypes.ENUM("CM", "PULGADAS", "MM"),
+      type: DataTypes.ENUM("CM", "M", "PULGADAS", "MM"),
       allowNull: false,
       defaultValue: "CM",
     },
     alto: {
-      type: DataTypes.DECIMAL(15,3),
+      type: DataTypes.DECIMAL(15, 3),
       allowNull: true,
     },
     radio: {

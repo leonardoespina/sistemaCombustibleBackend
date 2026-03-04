@@ -176,6 +176,8 @@ app.use("/api/solicitudes", require("./routes/solicitudRoutes"));
 app.use("/api/despacho", require("./routes/despachoRoutes"));
 app.use("/api/validacion", require("./routes/validacionRoutes"));
 app.use("/api/mediciones", require("./routes/medicionRoutes"));
+app.use("/api/cierres-turno", require("./routes/operaciones/cierreTurnoRoutes"));
+
 app.use("/api/cargas-cisterna", require("./routes/cargaCisternaRoutes"));
 app.use(
   "/api/transferencias-internas",

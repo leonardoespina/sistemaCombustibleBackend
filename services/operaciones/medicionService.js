@@ -1,10 +1,15 @@
-const { MedicionTanque, Tanque, Usuario, Llenadero } = require("../../models");
+const { MedicionTanque, MovimientoInventario, Tanque, Usuario, Llenadero } = require("../../models");
 const { paginate } = require("../../helpers/paginationHelper");
 const { executeTransaction } = require("../../helpers/transactionHelper");
 const { Op } = require("sequelize");
 
 /**
  * Crear Medición Física
+ *
+ * tipo_medicion:
+ *   INICIAL   → solo fotografía, NO modifica nivel_actual del tanque
+ *   CIERRE    → recalibra nivel_actual + crea MovimientoInventario AJUSTE_MEDICION
+ *   ORDINARIA → comportamiento clásico (recalibra + movimiento)
  */
 exports.crearMedicion = async (data, user, clientIp) => {
   const { id_usuario } = user;
@@ -16,6 +21,8 @@ exports.crearMedicion = async (data, user, clientIp) => {
     volumen_real,
     merma_evaporacion,
     observaciones,
+    tipo_medicion = "ORDINARIA",
+    id_cierre_turno = null,
   } = data;
 
   return await executeTransaction(clientIp, async (t) => {
@@ -32,11 +39,9 @@ exports.crearMedicion = async (data, user, clientIp) => {
     const volumen_teorico = parseFloat(tanque.nivel_actual);
     const v_real = parseFloat(volumen_real);
     const v_merma = parseFloat(merma_evaporacion || 0);
-
-    // 2. Calcular Diferencia Neta
     const diferencia = parseFloat((volumen_teorico - v_real).toFixed(2));
 
-    // 3. Crear Registro de Medición
+    // 2. Crear Registro de Medición
     const nuevaMedicion = await MedicionTanque.create(
       {
         id_tanque,
@@ -49,22 +54,47 @@ exports.crearMedicion = async (data, user, clientIp) => {
         diferencia,
         merma_evaporacion: v_merma,
         observaciones,
+        tipo_medicion,
+        id_cierre_turno,
         estado: "PROCESADO",
       },
-      { transaction: t },
+      { transaction: t }
     );
 
-    // 4. Ajustar el nivel actual del tanque con la medición real
-    await tanque.update({ nivel_actual: v_real }, { transaction: t });
+    // 3. Solo recalibrar nivel_actual si NO es una medición INICIAL
+    //    INICIAL = solo fotografía de referencia, no modifica el inventario
+    if (tipo_medicion !== "INICIAL") {
+      await tanque.update({ nivel_actual: v_real }, { transaction: t });
+
+      // 4. Registrar en MovimientoInventario
+      await MovimientoInventario.create(
+        {
+          id_tanque,
+          id_cierre_turno,
+          tipo_movimiento: "AJUSTE_MEDICION",
+          id_referencia: nuevaMedicion.id_medicion,
+          tabla_referencia: "mediciones_tanque",
+          volumen_antes: volumen_teorico,
+          volumen_despues: v_real,
+          variacion: parseFloat((v_real - volumen_teorico).toFixed(2)),
+          fecha_movimiento: new Date(),
+          id_usuario,
+          observaciones: `Medición física ${tipo_medicion}`,
+        },
+        { transaction: t }
+      );
+    }
 
     return {
       nuevaMedicion,
       v_real,
       id_tanque,
+      recalibrado: tipo_medicion !== "INICIAL",
       resumen: { teorico: volumen_teorico, real: v_real, diferencia },
     };
   });
 };
+
 
 /**
  * Listar Mediciones

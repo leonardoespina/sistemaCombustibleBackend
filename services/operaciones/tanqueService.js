@@ -23,6 +23,8 @@ exports.crearTanque = async (data, clientIp) => {
     ancho,
     con_aforo,
     aforo,
+    activo_para_despacho,
+    nivel_actual,
   } = data;
 
   return await executeTransaction(clientIp, async (t) => {
@@ -54,7 +56,37 @@ exports.crearTanque = async (data, clientIp) => {
       throw error;
     }
 
-    // 3. Crear registro
+    // 3. Regla de Negocio: Validar nivel_actual vs nivel_alarma_alto (o capacidad máxima)
+    const capMax = parseFloat(capacidad_maxima || 0);
+    const nivAlarmaAlto = parseFloat(nivel_alarma_alto || 0);
+    const nivAct = parseFloat(nivel_actual || 0);
+    const limiteMaximo = nivAlarmaAlto > 0 ? nivAlarmaAlto : capMax;
+
+    if (limiteMaximo > 0 && nivAct > limiteMaximo) {
+      const error = new Error(`El nivel actual (${nivAct}L) supera el límite máximo permitido (${limiteMaximo}L).`);
+      error.status = 400;
+      throw error;
+    }
+
+    // 4. Regla de Negocio: Solo un tanque activo para despacho por tipo de combustible en el Llenadero
+    if (activo_para_despacho) {
+      // Buscar si ya existe otro tanque activo para este combustible en este llenadero
+      const tanqueActivoPrevio = await Tanque.findOne({
+        where: {
+          id_llenadero,
+          id_tipo_combustible,
+          activo_para_despacho: true
+        },
+        transaction: t
+      });
+
+      if (tanqueActivoPrevio) {
+        // Desactivar el anterior
+        await tanqueActivoPrevio.update({ activo_para_despacho: false }, { transaction: t });
+      }
+    }
+
+    // 5. Crear registro
     const tanque = await Tanque.create(
       {
         id_llenadero,
@@ -62,8 +94,8 @@ exports.crearTanque = async (data, clientIp) => {
         nombre,
         id_tipo_combustible,
         tipo_tanque,
-        capacidad_maxima: capacidad_maxima || 0,
-        nivel_actual: 0,
+        capacidad_maxima: capMax,
+        nivel_actual: nivAct,
         nivel_alarma_bajo,
         nivel_alarma_alto,
         unidad_medida: unidad_medida || "CM",
@@ -72,6 +104,7 @@ exports.crearTanque = async (data, clientIp) => {
         largo,
         ancho,
         estado: "ACTIVO",
+        activo_para_despacho: !!activo_para_despacho,
         con_aforo: !!con_aforo,
         aforo: aforo || [],
       },
@@ -157,7 +190,40 @@ exports.actualizarTanque = async (id, data, clientIp) => {
       }
     }
 
-    // 3. Actualizar registro
+    // 3. Regla de Negocio: Validar nivel_actual vs nivel_alarma_alto (o capacidad máxima)
+    const nuevaCapacidad = data.capacidad_maxima !== undefined ? parseFloat(data.capacidad_maxima) : parseFloat(tanque.capacidad_maxima || 0);
+    const nuevoNivelAlarmaAlto = data.nivel_alarma_alto !== undefined ? parseFloat(data.nivel_alarma_alto) : parseFloat(tanque.nivel_alarma_alto || 0);
+    const nuevoNivel = data.nivel_actual !== undefined ? parseFloat(data.nivel_actual) : parseFloat(tanque.nivel_actual || 0);
+    const limiteActualizacion = nuevoNivelAlarmaAlto > 0 ? nuevoNivelAlarmaAlto : nuevaCapacidad;
+
+    if (limiteActualizacion > 0 && nuevoNivel > limiteActualizacion) {
+      const error = new Error(`El nivel a registrar (${nuevoNivel}L) supera el límite máximo permitido para este tanque (${limiteActualizacion}L).`);
+      error.status = 400;
+      throw error;
+    }
+
+    // 4. Regla de Negocio: Solo un tanque activo para despacho
+    // Si la actualización incluye activar este tanque para despacho
+    if (data.activo_para_despacho === true) {
+      const targetLlenadero = data.id_llenadero || tanque.id_llenadero;
+      const targetCombustible = data.id_tipo_combustible || tanque.id_tipo_combustible;
+
+      const tanqueActivoPrevio = await Tanque.findOne({
+        where: {
+          id_llenadero: targetLlenadero,
+          id_tipo_combustible: targetCombustible,
+          activo_para_despacho: true,
+          id_tanque: { [Op.ne]: id } // Excluir el tanque actual
+        },
+        transaction: t
+      });
+
+      if (tanqueActivoPrevio) {
+        await tanqueActivoPrevio.update({ activo_para_despacho: false }, { transaction: t });
+      }
+    }
+
+    // 5. Actualizar registro
     await tanque.update(data, { transaction: t });
 
     return tanque;

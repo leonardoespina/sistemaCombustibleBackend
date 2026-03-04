@@ -63,9 +63,21 @@ const MedicionTanque = sequelize.define(
       type: DataTypes.TEXT,
       allowNull: true,
     },
+    tipo_medicion: {
+      type: DataTypes.STRING(20),
+      defaultValue: "ORDINARIA",
+      comment: "INICIAL: solo fotografía, no modifica nivel_actual. CIERRE: recalibra nivel_actual. ORDINARIA: comportamiento clásico.",
+      validate: { isIn: [["INICIAL", "CIERRE", "ORDINARIA"]] },
+    },
+    id_cierre_turno: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      comment: "FK a CierreTurno. null = medición libre sin lote asignado",
+    },
     estado: {
-      type: DataTypes.ENUM("PROCESADO", "ANULADO"),
+      type: DataTypes.STRING(20),
       defaultValue: "PROCESADO",
+      validate: { isIn: [["PROCESADO", "ANULADO"]] },
     },
     fecha_registro: {
       type: DataTypes.DATE,
@@ -81,6 +93,7 @@ const MedicionTanque = sequelize.define(
 MedicionTanque.associate = (models) => {
   MedicionTanque.belongsTo(models.Tanque, { foreignKey: "id_tanque", as: "Tanque" });
   MedicionTanque.belongsTo(models.Usuario, { foreignKey: "id_usuario", as: "Usuario" });
+  MedicionTanque.belongsTo(models.CierreTurno, { foreignKey: "id_cierre_turno", as: "CierreTurno" });
 };
 
 module.exports = MedicionTanque;

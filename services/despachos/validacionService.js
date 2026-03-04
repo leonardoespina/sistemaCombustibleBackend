@@ -1,5 +1,6 @@
 const {
   Solicitud,
+  MovimientoInventario,
   CupoActual,
   Llenadero,
   Subdependencia,
@@ -185,6 +186,32 @@ exports.finalizarTicket = async (data, user, clientIp) => {
       },
       { transaction: t },
     );
+
+    // Registrar MovimientoInventario al momento de FINALIZAR
+    // Se reutiliza tanqueActivo ya buscado arriba en la misma transacción.
+    if (tanqueActivo) {
+      const volumen_despues_final = parseFloat(tanqueActivo.nivel_actual);
+      const volumen_antes_final = parseFloat(
+        (volumen_despues_final + cantidadReal).toFixed(2)
+      );
+
+      await MovimientoInventario.create(
+        {
+          id_tanque: tanqueActivo.id_tanque,
+          id_cierre_turno: null,   // null = pendiente de asignar al próximo lote
+          tipo_movimiento: "DESPACHO",
+          id_referencia: solicitud.id_solicitud,
+          tabla_referencia: "solicitudes",
+          volumen_antes: volumen_antes_final,
+          volumen_despues: volumen_despues_final,
+          variacion: parseFloat((-cantidadReal).toFixed(2)),
+          fecha_movimiento: new Date(),
+          id_usuario: id_validador,
+          observaciones: `Finalización ticket ${solicitud.codigo_ticket}`,
+        },
+        { transaction: t }
+      );
+    }
 
     return {
       msg: "Ticket finalizado correctamente.",
