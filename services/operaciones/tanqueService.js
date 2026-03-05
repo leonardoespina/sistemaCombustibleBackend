@@ -4,6 +4,41 @@ const { executeTransaction } = require("../../helpers/transactionHelper");
 const { Op } = require("sequelize");
 
 /**
+ * Validar límites de capacidad y niveles de alarma de un tanque
+ */
+const MARGEN_TOLERANCIA = 0.001; // 1% de tolerancia para errores de medición (vara)
+
+const validarLimitesTanque = (data, tanqueExistente = null) => {
+  const capMax = parseFloat(data.capacidad_maxima !== undefined ? data.capacidad_maxima : (tanqueExistente?.capacidad_maxima || 0));
+  const nivAct = parseFloat(data.nivel_actual !== undefined ? data.nivel_actual : (tanqueExistente?.nivel_actual || 0));
+  const nivAlarmaAlto = parseFloat(data.nivel_alarma_alto !== undefined ? data.nivel_alarma_alto : (tanqueExistente?.nivel_alarma_alto || 0));
+  const nivAlarmaBajo = parseFloat(data.nivel_alarma_bajo !== undefined ? data.nivel_alarma_bajo : (tanqueExistente?.nivel_alarma_bajo || 0));
+
+  if (capMax <= 0) {
+    throw Object.assign(new Error("La capacidad máxima debe ser mayor a 0"), { status: 400 });
+  }
+
+  // Aplicar margen de tolerancia sobre la capacidad física
+  const limiteConMargen = capMax * (1 + MARGEN_TOLERANCIA);
+
+  if (nivAct > limiteConMargen) {
+    throw Object.assign(new Error(`El nivel actual (${nivAct}L) supera el límite físico permitido con margen de error (${limiteConMargen.toFixed(2)}L)`), { status: 400 });
+  }
+
+  if (nivAlarmaAlto > limiteConMargen) {
+    throw Object.assign(new Error(`El nivel de alarma alto (${nivAlarmaAlto}L) no puede superar el límite físico permitido con margen de error (${limiteConMargen.toFixed(2)}L)`), { status: 400 });
+  }
+
+  if (nivAlarmaAlto > 0 && nivAlarmaBajo >= nivAlarmaAlto) {
+    throw Object.assign(new Error(`El nivel de alarma bajo (${nivAlarmaBajo}L) debe ser menor al nivel de alarma alto (${nivAlarmaAlto}L)`), { status: 400 });
+  }
+
+  if (nivAct < 0) {
+    throw Object.assign(new Error("El nivel actual no puede ser negativo"), { status: 400 });
+  }
+};
+
+/**
  * Crear Tanque
  */
 exports.crearTanque = async (data, clientIp) => {
@@ -56,17 +91,8 @@ exports.crearTanque = async (data, clientIp) => {
       throw error;
     }
 
-    // 3. Regla de Negocio: Validar nivel_actual vs nivel_alarma_alto (o capacidad máxima)
-    const capMax = parseFloat(capacidad_maxima || 0);
-    const nivAlarmaAlto = parseFloat(nivel_alarma_alto || 0);
-    const nivAct = parseFloat(nivel_actual || 0);
-    const limiteMaximo = nivAlarmaAlto > 0 ? nivAlarmaAlto : capMax;
-
-    if (limiteMaximo > 0 && nivAct > limiteMaximo) {
-      const error = new Error(`El nivel actual (${nivAct}L) supera el límite máximo permitido (${limiteMaximo}L).`);
-      error.status = 400;
-      throw error;
-    }
+    // 3. Validar Límites y Capacidad
+    validarLimitesTanque(data);
 
     // 4. Regla de Negocio: Solo un tanque activo para despacho por tipo de combustible en el Llenadero
     if (activo_para_despacho) {
@@ -190,17 +216,8 @@ exports.actualizarTanque = async (id, data, clientIp) => {
       }
     }
 
-    // 3. Regla de Negocio: Validar nivel_actual vs nivel_alarma_alto (o capacidad máxima)
-    const nuevaCapacidad = data.capacidad_maxima !== undefined ? parseFloat(data.capacidad_maxima) : parseFloat(tanque.capacidad_maxima || 0);
-    const nuevoNivelAlarmaAlto = data.nivel_alarma_alto !== undefined ? parseFloat(data.nivel_alarma_alto) : parseFloat(tanque.nivel_alarma_alto || 0);
-    const nuevoNivel = data.nivel_actual !== undefined ? parseFloat(data.nivel_actual) : parseFloat(tanque.nivel_actual || 0);
-    const limiteActualizacion = nuevoNivelAlarmaAlto > 0 ? nuevoNivelAlarmaAlto : nuevaCapacidad;
-
-    if (limiteActualizacion > 0 && nuevoNivel > limiteActualizacion) {
-      const error = new Error(`El nivel a registrar (${nuevoNivel}L) supera el límite máximo permitido para este tanque (${limiteActualizacion}L).`);
-      error.status = 400;
-      throw error;
-    }
+    // 3. Validar Límites y Capacidad
+    validarLimitesTanque(data, tanque);
 
     // 4. Regla de Negocio: Solo un tanque activo para despacho
     // Si la actualización incluye activar este tanque para despacho
@@ -282,6 +299,7 @@ exports.obtenerListaTanques = async (query) => {
     where,
     attributes: [
       "id_tanque",
+      "id_llenadero",
       "codigo",
       "nombre",
       "capacidad_maxima",
@@ -292,6 +310,7 @@ exports.obtenerListaTanques = async (query) => {
     ],
     include: [
       { model: TipoCombustible, as: "TipoCombustible", attributes: ["nombre"] },
+      { model: Llenadero, as: "Llenadero", attributes: ["nombre_llenadero"] },
     ],
     order: [["nombre", "ASC"]],
   });

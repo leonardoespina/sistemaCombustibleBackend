@@ -114,12 +114,27 @@ exports.generarCierre = async (data, user, clientIp) => {
     }
 
     return await executeTransaction(clientIp, async (t) => {
-        // 1. Crear CierreTurno directamente en CERRADO
+        // 1. Buscar una solicitud finalizada pendiente de cierre para obtener su PCP (id_validador)
+        const solicitudConValidador = await Solicitud.findOne({
+            where: {
+                id_cierre_turno: null,
+                id_llenadero,
+                estado: "FINALIZADA",
+                id_validador: { [Op.not]: null } // Que tenga un validador registrado
+            },
+            order: [["fecha_despacho", "DESC"]], // Tomamos el más reciente
+            transaction: t,
+        });
+
+        // Este será el usuario PCP asignado automáticamente al cierre
+        const pcpAutomatico = solicitudConValidador ? solicitudConValidador.id_validador : null;
+
+        // 2. Crear CierreTurno directamente en CERRADO
         const cierre = await CierreTurno.create(
             {
                 id_llenadero,
                 id_usuario_almacen: id_usuario,
-                id_usuario_pcp: id_usuario_pcp || null,
+                id_usuario_pcp: pcpAutomatico, // <--- Automático, no viaja del frontend
                 turno,
                 fecha_lote,
                 hora_inicio_lote,
@@ -407,7 +422,7 @@ exports.generarReporteTurno = async (id_cierre) => {
 
         filas.push({
             item: item++,
-            fecha: sol.fecha_despacho,
+            fecha: sol.fecha_validacion ? new Date(sol.fecha_validacion).toLocaleString('es-VE', { dateStyle: 'short', timeStyle: 'short' }) : '—',
             nombre_apellido: `${sol.Solicitante?.nombre || ""} ${sol.Solicitante?.apellido || ""}`.trim(),
             vehiculo: `${sol.marca || ""} ${sol.modelo || ""}`.trim(),
             placa: sol.placa,

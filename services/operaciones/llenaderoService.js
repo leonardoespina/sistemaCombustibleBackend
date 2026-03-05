@@ -69,9 +69,9 @@ exports.obtenerLlenaderos = async (query, user) => {
       },
     ],
   });
-
   // Transform results to aggregate capabilities per fuel type
   if (result && result.data) {
+
     result.data = result.data.map(llenadero => {
       const jsonLlenadero = llenadero.toJSON();
       const totalesPorCombustible = {};
@@ -193,7 +193,8 @@ exports.obtenerListaLlenaderos = async () => {
         model: Tanque,
         as: "Tanques",
         attributes: ["id_tipo_combustible", "nombre", "activo_para_despacho"],
-        where: { estado: 'ACTIVO' }
+        where: { estado: 'ACTIVO' },
+        required: false
       },
     ],
     order: [["nombre_llenadero", "ASC"]],

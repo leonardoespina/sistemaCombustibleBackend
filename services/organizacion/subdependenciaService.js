@@ -138,6 +138,12 @@ exports.obtenerSubdependencias = async (query, user) => {
   if (!user || user.tipo_usuario !== "ADMIN") {
     where.estatus = "ACTIVO";
   }
+
+  // Si se pide una dependencia específica, filtrar por ella (vital para que cada usuario vea solo lo suyo)
+  if (query.id_dependencia) {
+    where.id_dependencia = query.id_dependencia;
+  }
+
   console.log(`[DEBUG subdep] where final:`, JSON.stringify(where));
 
   return await paginate(Subdependencia, query, {

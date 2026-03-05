@@ -41,6 +41,7 @@ router.post(
       "El tipo de combustible es obligatorio",
     ).isNumeric(),
     check("es_generador").optional().isBoolean(),
+    check("es_planta").optional().isBoolean(),
     validarCampos,
   ],
   vehiculoController.crearVehiculo,
@@ -62,6 +63,7 @@ router.put(
       .optional()
       .isNumeric(),
     check("es_generador").optional().isBoolean(),
+    check("es_planta").optional().isBoolean(),
     validarCampos,
   ],
   vehiculoController.actualizarVehiculo,

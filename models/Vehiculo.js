@@ -13,12 +13,18 @@ const Vehiculo = sequelize.define(
       type: DataTypes.STRING(20),
       allowNull: false,
     },
- 
+
     es_generador: {
       type: DataTypes.BOOLEAN,
       allowNull: false,
       defaultValue: false,
-      comment: "TRUE si es planta eléctrica/generador, FALSE si es vehículo flota",
+      comment: "TRUE si es generador eléctrico, FALSE si es vehículo flota o planta",
+    },
+    es_planta: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+      comment: "TRUE si es planta, FALSE si es vehículo flota o generador",
     },
     // Relación con Tipo de Combustible (Migrado de string a FK)
     id_tipo_combustible: {
@@ -77,7 +83,7 @@ Vehiculo.associate = (models) => {
   Vehiculo.belongsTo(models.Dependencia, { foreignKey: "id_dependencia", as: "Dependencia" });
   Vehiculo.belongsTo(models.Subdependencia, { foreignKey: "id_subdependencia", as: "Subdependencia" });
   Vehiculo.belongsTo(models.TipoCombustible, { foreignKey: "id_tipo_combustible", as: "TipoCombustible" });
-  
+
   // Vehiculo.hasMany(models.CargaCisterna, { foreignKey: "id_vehiculo" });
   // Vehiculo.hasMany(models.Despacho, { foreignKey: "id_vehiculo" });
 };

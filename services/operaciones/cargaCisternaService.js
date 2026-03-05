@@ -1,5 +1,6 @@
 const {
   CargaCisterna,
+  CargaCisternaTanque,
   Tanque,
   Usuario,
   TipoCombustible,
@@ -9,7 +10,7 @@ const { executeTransaction } = require("../../helpers/transactionHelper");
 const { Op } = require("sequelize");
 
 /**
- * Crear Carga de Cisterna
+ * Crear Carga de Cisterna Múltiples Tanques
  */
 exports.crearCargaCisterna = async (data, user, clientIp) => {
   const { id_usuario } = user;
@@ -21,31 +22,46 @@ exports.crearCargaCisterna = async (data, user, clientIp) => {
     hora,
     placa_cisterna,
     nombre_chofer,
-    id_tanque,
     litros_segun_guia,
-    medida_inicial,
-    medida_final,
-    litros_iniciales,
-    litros_finales,
-    litros_recibidos,
     diferencia_guia,
     litros_flujometro,
     peso_entrada,
     peso_salida,
     hora_inicio_descarga,
     hora_fin_descarga,
+    tiempo_descarga,
+    aforo_compartimiento,
     observacion,
+    tanques_descarga, // Array de tanques
+    // Mantenemos por si el front envía los scalars temporalmente
+    id_tanque, medida_inicial, medida_final, litros_iniciales, litros_finales, litros_recibidos
   } = data;
 
   return await executeTransaction(clientIp, async (t) => {
-    const tanque = await Tanque.findByPk(id_tanque, {
-      transaction: t,
-      lock: true,
-    });
-    if (!tanque) {
-      throw new Error("Tanque receptor no encontrado.");
+    // 1. Manejo de retrocompatibilidad y normalización a Array
+    let tanquesArray = [];
+    if (tanques_descarga && Array.isArray(tanques_descarga) && tanques_descarga.length > 0) {
+      tanquesArray = tanques_descarga;
+    } else if (id_tanque) {
+      // Legacy support temporal
+      tanquesArray = [{
+        id_tanque, medida_inicial, medida_final, litros_iniciales, litros_finales,
+        litros_recibidos: (litros_recibidos || 0)
+      }];
     }
 
+    if (tanquesArray.length === 0) {
+      throw new Error("Debe especificar al menos un tanque de destino para la descarga.");
+    }
+
+    // 2. Extraer el primer tanque para el combustible
+    const primerTanque = await Tanque.findByPk(tanquesArray[0].id_tanque, { transaction: t });
+    if (!primerTanque) throw new Error("Tanque receptor inicial no encontrado.");
+
+    // Calcular el total de litros recibidos global sumando cada iteración
+    const totalLitrosRecibidosFinal = tanquesArray.reduce((acc, tk) => acc + parseFloat(tk.litros_recibidos || 0), 0);
+
+    // 3. Crear cabecera CargaCisterna
     const nuevaCarga = await CargaCisterna.create(
       {
         numero_guia,
@@ -55,32 +71,47 @@ exports.crearCargaCisterna = async (data, user, clientIp) => {
         placa_cisterna,
         nombre_chofer,
         id_almacenista: id_usuario,
-        id_tanque,
-        id_tipo_combustible: tanque.id_tipo_combustible,
+        id_tipo_combustible: primerTanque.id_tipo_combustible,
         litros_segun_guia,
-        medida_inicial,
-        medida_final,
-        litros_iniciales,
-        litros_finales,
-        litros_recibidos,
+        // Variables legacy pero globales
+        id_tanque: tanquesArray.length === 1 ? tanquesArray[0].id_tanque : null,
+        litros_recibidos: totalLitrosRecibidosFinal,
         diferencia_guia,
         litros_flujometro,
         peso_entrada,
         peso_salida,
         hora_inicio_descarga,
         hora_fin_descarga,
+        tiempo_descarga,
+        aforo_compartimiento,
         observacion,
         id_usuario_registro: id_usuario,
         estado: "PROCESADO",
       },
-      { transaction: t },
+      { transaction: t }
     );
 
-    const nuevoNivel =
-      parseFloat(tanque.nivel_actual) + parseFloat(litros_recibidos);
-    await tanque.update({ nivel_actual: nuevoNivel }, { transaction: t });
+    // 4. Iterar y guardar los Detalles y Actualizar niveles de Tank
+    for (const tk of tanquesArray) {
+      const tanqueActual = await Tanque.findByPk(tk.id_tanque, { transaction: t, lock: true });
+      if (!tanqueActual) throw new Error(`Tanque receptor con ID ${tk.id_tanque} no encontrado.`);
 
-    return { nuevaCarga, nuevoNivel, id_tanque };
+      await CargaCisternaTanque.create({
+        id_carga: nuevaCarga.id_carga,
+        id_tanque: tk.id_tanque,
+        medida_inicial: tk.medida_inicial,
+        medida_final: tk.medida_final,
+        litros_iniciales: tk.litros_iniciales,
+        litros_finales: tk.litros_finales,
+        litros_recibidos: tk.litros_recibidos
+      }, { transaction: t });
+
+      // El usuario mide el tanque (litros_finales), indicando la existencia física total tras cargar
+      const nuevoNivelObj = parseFloat(tk.litros_finales) || 0;
+      await tanqueActual.update({ nivel_actual: nuevoNivelObj }, { transaction: t });
+    }
+
+    return { nuevaCarga, tanquesProcesados: tanquesArray.length };
   });
 };
 
@@ -91,7 +122,10 @@ exports.listarCargasCisterna = async (query) => {
   const { id_tanque, fecha_inicio, fecha_fin } = query;
   const where = {};
 
-  if (id_tanque) where.id_tanque = id_tanque;
+  if (id_tanque) {
+    where.id_tanque = id_tanque; // Nota: Si hay filtro estricto requeriria join en CargaCisternaTanque en el futuro.
+  }
+
   if (fecha_inicio && fecha_fin) {
     where.fecha_llegada = { [Op.between]: [fecha_inicio, fecha_fin] };
   }
@@ -102,7 +136,12 @@ exports.listarCargasCisterna = async (query) => {
     where,
     searchableFields,
     include: [
-      { model: Tanque, as: "Tanque", attributes: ["codigo", "nombre"] },
+      { model: Tanque, as: "Tanque", attributes: ["codigo", "nombre"] }, // Legacy
+      {
+        model: CargaCisternaTanque,
+        as: "tanques_descarga",
+        include: [{ model: Tanque, as: "Tanque", attributes: ["codigo", "nombre"] }]
+      },
       {
         model: Usuario,
         as: "Almacenista",
@@ -114,7 +153,7 @@ exports.listarCargasCisterna = async (query) => {
 };
 
 /**
- * Actualizar Carga
+ * Actualizar Carga (Reducido a solo métricas de la cabecera por seguridad)
  */
 exports.actualizarCarga = async (id, data, clientIp) => {
   const {
@@ -125,38 +164,16 @@ exports.actualizarCarga = async (id, data, clientIp) => {
     hora,
     placa_cisterna,
     nombre_chofer,
-    litros_recibidos,
+    tiempo_descarga,
+    aforo_compartimiento,
     observacion,
+    // (Por seguridad no actualizaremos tanques en Update para evitar romper logs de inventario,
+    // a menos que sea necesario revertir y re-aplicar).
   } = data;
 
   return await executeTransaction(clientIp, async (t) => {
-    const carga = await CargaCisterna.findByPk(id, {
-      transaction: t,
-      lock: true,
-    });
-    if (!carga) {
-      throw new Error("Carga no encontrada.");
-    }
-
-    const v_recibido_nuevo = parseFloat(litros_recibidos);
-    const v_recibido_anterior = parseFloat(carga.litros_recibidos);
-    let nuevoNivel = null;
-    let id_tanque = null;
-
-    if (v_recibido_nuevo !== v_recibido_anterior) {
-      const tanque = await Tanque.findByPk(carga.id_tanque, {
-        transaction: t,
-        lock: true,
-      });
-      if (tanque) {
-        nuevoNivel =
-          parseFloat(tanque.nivel_actual) -
-          v_recibido_anterior +
-          v_recibido_nuevo;
-        await tanque.update({ nivel_actual: nuevoNivel }, { transaction: t });
-        id_tanque = tanque.id_tanque;
-      }
-    }
+    const carga = await CargaCisterna.findByPk(id, { transaction: t, lock: true });
+    if (!carga) throw new Error("Carga no encontrada.");
 
     await carga.update(
       {
@@ -166,12 +183,13 @@ exports.actualizarCarga = async (id, data, clientIp) => {
         fecha_llegada: `${fecha}T${hora}`,
         placa_cisterna,
         nombre_chofer,
-        litros_recibidos: v_recibido_nuevo,
+        tiempo_descarga,
+        aforo_compartimiento,
         observacion,
       },
       { transaction: t },
     );
 
-    return { carga, nuevoNivel, id_tanque };
+    return { carga };
   });
 };

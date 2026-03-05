@@ -48,11 +48,11 @@ router.put(
 
 // --- RUTAS PROTEGIDAS (Requieren Token) ---
 
-// GET /api/usuarios (Listar) - Solo ADMIN
+// GET /api/usuarios (Listar) - Accesible para Admin y roles operativos para listar selectores
 router.get(
   "/",
   autenticarUsuario,
-  authorizeRole(["ADMIN"]),
+
   usuarioController.obtenerUsuarios,
 );
 

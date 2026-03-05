@@ -25,6 +25,7 @@ exports.crearVehiculo = async (data, user, clientIp) => {
     id_dependencia,
     id_subdependencia,
     es_generador,
+    es_planta,
     id_tipo_combustible,
   } = data;
 
@@ -77,6 +78,7 @@ exports.crearVehiculo = async (data, user, clientIp) => {
         id_subdependencia: id_subdependencia || null,
         id_tipo_combustible,
         es_generador: es_generador || false,
+        es_planta: es_planta || false,
         registrado_por: user.id_usuario,
         fecha_registro: new Date(),
         fecha_modificacion: new Date(),
@@ -102,6 +104,7 @@ exports.obtenerVehiculos = async (query, user) => {
     id_subdependencia,
     id_tipo_combustible,
     es_generador,
+    es_planta,
     estado,
   } = query;
 
@@ -113,6 +116,7 @@ exports.obtenerVehiculos = async (query, user) => {
   if (id_subdependencia) where.id_subdependencia = id_subdependencia;
   if (id_tipo_combustible) where.id_tipo_combustible = id_tipo_combustible;
   if (es_generador !== undefined) where.es_generador = es_generador === "true";
+  if (es_planta !== undefined) where.es_planta = es_planta === "true";
 
   if (user && user.tipo_usuario !== "ADMIN") {
     where.estado = "ACTIVO";
@@ -150,6 +154,7 @@ exports.actualizarVehiculo = async (id, data, clientIp) => {
     id_dependencia,
     id_subdependencia,
     es_generador,
+    es_planta,
     id_tipo_combustible,
     estado,
   } = data;
@@ -203,6 +208,7 @@ exports.actualizarVehiculo = async (id, data, clientIp) => {
     if (id_subdependencia !== undefined)
       vehiculo.id_subdependencia = id_subdependencia;
     if (es_generador !== undefined) vehiculo.es_generador = es_generador;
+    if (es_planta !== undefined) vehiculo.es_planta = es_planta;
     if (estado) vehiculo.estado = estado;
 
     vehiculo.fecha_modificacion = new Date();
@@ -235,10 +241,11 @@ exports.desactivarVehiculo = async (id, clientIp) => {
  * Lista Simple para selectores
  */
 exports.obtenerListaVehiculos = async (query) => {
-  const { es_generador, id_categoria, id_dependencia } = query;
+  const { es_generador, es_planta, id_categoria, id_dependencia } = query;
   const where = { estado: "ACTIVO" };
 
   if (es_generador !== undefined) where.es_generador = es_generador === "true";
+  if (es_planta !== undefined) where.es_planta = es_planta === "true";
   if (id_categoria) where.id_categoria = id_categoria;
   if (id_dependencia) where.id_dependencia = id_dependencia;
 

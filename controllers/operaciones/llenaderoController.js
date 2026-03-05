@@ -113,6 +113,7 @@ exports.obtenerListaLlenaderos = async (req, res) => {
   try {
     const llenaderos = await llenaderoService.obtenerListaLlenaderos();
     res.json(llenaderos);
+    console.log(llenaderos);
   } catch (error) {
     console.error(error);
     res.status(500).json({ msg: "Error al obtener la lista de llenaderos" });

@@ -42,7 +42,7 @@ const CargaCisterna = sequelize.define(
     },
     id_tanque: {
       type: DataTypes.INTEGER,
-      allowNull: false,
+      allowNull: true, // Null en cargas multi-tanque; el detalle está en CargaCisternaTanque
     },
     id_tipo_combustible: {
       type: DataTypes.INTEGER,
@@ -62,11 +62,11 @@ const CargaCisterna = sequelize.define(
     },
     litros_iniciales: {
       type: DataTypes.DECIMAL(15, 2),
-      allowNull: false,
+      allowNull: true,
     },
     litros_finales: {
       type: DataTypes.DECIMAL(15, 2),
-      allowNull: false,
+      allowNull: true,
     },
     litros_recibidos: {
       type: DataTypes.DECIMAL(15, 2),
@@ -100,6 +100,16 @@ const CargaCisterna = sequelize.define(
       type: DataTypes.TEXT,
       allowNull: true,
     },
+    tiempo_descarga: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      comment: "Tiempo total de descarga en minutos",
+    },
+    aforo_compartimiento: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      comment: "Array con la tabla de aforo utilizada para validar esta carga",
+    },
     estado: {
       type: DataTypes.ENUM("PROCESADO", "ANULADO"),
       defaultValue: "PROCESADO",
@@ -120,10 +130,11 @@ const CargaCisterna = sequelize.define(
 );
 
 CargaCisterna.associate = (models) => {
-  CargaCisterna.belongsTo(models.Tanque, { foreignKey: "id_tanque", as: "Tanque" });
+  CargaCisterna.belongsTo(models.Tanque, { foreignKey: "id_tanque", as: "Tanque", constraints: false });
   CargaCisterna.belongsTo(models.Usuario, { foreignKey: "id_almacenista", as: "Almacenista" });
   CargaCisterna.belongsTo(models.Usuario, { foreignKey: "id_usuario_registro", as: "UsuarioRegistro" });
   CargaCisterna.belongsTo(models.TipoCombustible, { foreignKey: "id_tipo_combustible", as: "TipoCombustible" });
+  CargaCisterna.hasMany(models.CargaCisternaTanque, { foreignKey: "id_carga", as: "tanques_descarga" });
 };
 
 module.exports = CargaCisterna;
