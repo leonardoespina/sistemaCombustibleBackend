@@ -4,6 +4,7 @@ const {
   Tanque,
   Usuario,
   TipoCombustible,
+  MovimientoInventario
 } = require("../../models");
 const { paginate } = require("../../helpers/paginationHelper");
 const { executeTransaction } = require("../../helpers/transactionHelper");
@@ -106,9 +107,34 @@ exports.crearCargaCisterna = async (data, user, clientIp) => {
         litros_recibidos: tk.litros_recibidos
       }, { transaction: t });
 
-      // El usuario mide el tanque (litros_finales), indicando la existencia física total tras cargar
-      const nuevoNivelObj = parseFloat(tk.litros_finales) || 0;
-      await tanqueActual.update({ nivel_actual: nuevoNivelObj }, { transaction: t });
+      const volumenAntes = parseFloat(tanqueActual.nivel_actual || 0);
+
+      let volumenDespues;
+      const { fuente_actualizacion } = data;
+      const valorFlujometro = parseFloat(litros_flujometro || 0);
+
+      if (fuente_actualizacion === "FLUJOMETRO" && valorFlujometro > 0) {
+        const litrosRealesRecibidos = tanquesArray.length > 1 ? parseFloat(tk.litros_recibidos || 0) : valorFlujometro;
+        volumenDespues = volumenAntes + litrosRealesRecibidos;
+      } else {
+        volumenDespues = parseFloat(tk.litros_finales || 0);
+      }
+
+      await MovimientoInventario.create({
+        id_tanque: tk.id_tanque,
+        id_cierre_turno: null,
+        tipo_movimiento: "RECEPCION_CISTERNA",
+        id_referencia: nuevaCarga.id_carga,
+        tabla_referencia: "cargas_cisternas",
+        volumen_antes: volumenAntes,
+        volumen_despues: volumenDespues,
+        variacion: volumenDespues - volumenAntes,
+        id_usuario: id_usuario,
+        observaciones: `Recepción Cisterna Placa: ${placa_cisterna} (Origen: ${fuente_actualizacion})`
+      }, { transaction: t });
+
+      // Actualizar el inventario físico con la decisión del usuario
+      await tanqueActual.update({ nivel_actual: volumenDespues }, { transaction: t });
     }
 
     return { nuevaCarga, tanquesProcesados: tanquesArray.length };

@@ -126,3 +126,15 @@ exports.generarReporte = async (req, res) => {
         res.status(500).json({ msg: error.message });
     }
 };
+
+/**
+ * GET /cierres-turno/:id/acta
+ */
+exports.generarActaTurno = async (req, res) => {
+    try {
+        const acta = await svc.generarActaTurno(req.params.id);
+        res.json(acta);
+    } catch (error) {
+        res.status(500).json({ msg: error.message });
+    }
+};

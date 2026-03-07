@@ -14,5 +14,6 @@ router.post("/generar", ctrl.generarCierre);
 router.get("/", ctrl.listarCierres);
 router.get("/:id", ctrl.obtenerCierre);
 router.get("/:id/reporte", ctrl.generarReporte);
+router.get("/:id/acta", ctrl.generarActaTurno);
 
 module.exports = router;
