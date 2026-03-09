@@ -20,6 +20,8 @@ const autenticarUsuario = async (req, res, next) => {
         "nombre",
         "apellido",
         "tipo_usuario",
+        "rol_sistema",
+        "capacidad_solicitudes",
         "id_dependencia",
         "id_subdependencia",
       ],
@@ -51,6 +53,8 @@ const autenticarUsuario = async (req, res, next) => {
   }
 };
 
+const { hasPermission } = require("../utils/permissions");
+
 const authorizeRole = (roles) => {
   return (req, res, next) => {
     if (!req.usuario) {
@@ -68,4 +72,20 @@ const authorizeRole = (roles) => {
   };
 };
 
-module.exports = { autenticarUsuario, authorizeRole };
+const authorizePermission = (permission) => {
+  return (req, res, next) => {
+    if (!req.usuario) {
+      return res.status(500).json({ msg: "Usuario no autenticado para verificar permisos" });
+    }
+
+    if (!hasPermission(req.usuario, permission)) {
+      return res.status(403).json({
+        msg: `Acceso denegado: No posees la capacidad requerida (${permission}) para realizar esta acción.`,
+      });
+    }
+
+    next();
+  };
+};
+
+module.exports = { autenticarUsuario, authorizeRole, authorizePermission };

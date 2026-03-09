@@ -4,15 +4,16 @@ const { check } = require("express-validator");
 const tanqueController = require("../controllers/operaciones/tanqueController");
 const {
   autenticarUsuario,
-  authorizeRole,
+  authorizePermission,
 } = require("../middlewares/authMiddleware");
+const { PERMISSIONS } = require("../utils/permissions");
 const validarCampos = require("../middlewares/validationMiddleware");
 
 // Todas las rutas requieren estar logueado
 router.use(autenticarUsuario);
 
 // GET /api/tanques - Listar (Solo ADMIN)
-router.get("/", authorizeRole(["ADMIN"]), tanqueController.obtenerTanques);
+router.get("/", authorizePermission(PERMISSIONS.MANAGE_SYSTEM), tanqueController.obtenerTanques);
 
 // GET /api/tanques/lista - Para selectores (Todos los autenticados)
 router.get("/lista", tanqueController.obtenerListaTanques);
@@ -24,7 +25,7 @@ router.get("/:id", tanqueController.obtenerTanquePorId);
 router.post(
   "/",
   [
-    authorizeRole(["ADMIN"]),
+    authorizePermission(PERMISSIONS.MANAGE_SYSTEM),
     check("id_llenadero", "El ID de llenadero es obligatorio").isNumeric(),
     check("codigo", "El código es obligatorio").not().isEmpty(),
     check("nombre", "El nombre es obligatorio").not().isEmpty(),
@@ -49,7 +50,7 @@ router.post(
 router.put(
   "/:id",
   [
-    authorizeRole(["ADMIN"]),
+    authorizePermission(PERMISSIONS.MANAGE_SYSTEM),
     check("id_llenadero", "El ID de llenadero debe ser numérico")
       .optional()
       .isNumeric(),
@@ -73,7 +74,7 @@ router.put(
 // DELETE /api/tanques/:id - Desactivar (Solo ADMIN)
 router.delete(
   "/:id",
-  [authorizeRole(["ADMIN"]), validarCampos],
+  [authorizePermission(PERMISSIONS.MANAGE_SYSTEM), validarCampos],
   tanqueController.eliminarTanque,
 );
 

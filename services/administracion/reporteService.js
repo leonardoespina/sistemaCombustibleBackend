@@ -76,12 +76,44 @@ async function getReporteDiario({ id_llenadero, fecha, query }) {
         estado: "FINALIZADA",
     };
 
-    // Totales globales (no paginados)
-    const [totalInstitucional, totalVentaLitros, totalVentaMonto] = await Promise.all([
-        Solicitud.sum("cantidad_despachada", { where: { ...whereBase, tipo_solicitud: "INSTITUCIONAL" } }),
-        Solicitud.sum("cantidad_despachada", { where: { ...whereBase, tipo_solicitud: "VENTA" } }),
-        Solicitud.sum("monto_total", { where: { ...whereBase, tipo_solicitud: "VENTA" } }),
-    ]);
+    // Totales agrupados por Combustible y Tipo de Solicitud
+    const agrupados = await Solicitud.findAll({
+        where: whereBase,
+        attributes: [
+            "tipo_solicitud",
+            [sequelize.col("TipoCombustible.nombre"), "combustible"],
+            [sequelize.fn("SUM", sequelize.col("cantidad_despachada")), "total_litros"],
+            [sequelize.fn("SUM", sequelize.col("monto_total")), "total_monto"]
+        ],
+        include: [{ model: TipoCombustible, attributes: [] }],
+        group: ["tipo_solicitud", "TipoCombustible.id_tipo_combustible", "TipoCombustible.nombre"],
+        raw: true
+    });
+
+    const totalesPorCombustible = {};
+    let totalInstitucional = 0;
+    let totalVentaLitros = 0;
+    let totalVentaMonto = 0;
+
+    agrupados.forEach(row => {
+        const tipoCombs = row.combustible || "S/I";
+        const litros = parseFloat(row.total_litros) || 0;
+        const monto = parseFloat(row.total_monto) || 0;
+
+        if (!totalesPorCombustible[tipoCombs]) {
+            totalesPorCombustible[tipoCombs] = { institucional: 0, venta: 0, total: 0 };
+        }
+
+        if (row.tipo_solicitud === "INSTITUCIONAL") {
+            totalesPorCombustible[tipoCombs].institucional += litros;
+            totalInstitucional += litros;
+        } else if (row.tipo_solicitud === "VENTA") {
+            totalesPorCombustible[tipoCombs].venta += litros;
+            totalVentaLitros += litros;
+            totalVentaMonto += monto;
+        }
+        totalesPorCombustible[tipoCombs].total += litros;
+    });
 
     const result = await paginate(Solicitud, query, {
         where: whereBase,
@@ -100,6 +132,7 @@ async function getReporteDiario({ id_llenadero, fecha, query }) {
                 model: PrecioCombustible, as: "PrecioCombustible", attributes: ["precio", "id_moneda"],
                 include: [{ model: Moneda, as: "Moneda", attributes: ["nombre", "simbolo"] }],
             },
+            { model: TipoCombustible, attributes: ["nombre"] },
         ],
         attributes: [
             "id_solicitud", "codigo_ticket", "fecha_validacion",
@@ -136,6 +169,7 @@ async function getReporteDiario({ id_llenadero, fecha, query }) {
             subdependencia: v.Subdependencia?.nombre,
             cant_solic: v.cantidad_litros,
             cant_desp: v.cantidad_despachada,
+            tipo_combustible: v.TipoCombustible?.nombre || "S/I",
             precio: v.PrecioCombustible?.precio || v.precio_unitario,
             total_pagar: v.monto_total,
             moneda: simbolo,
@@ -153,6 +187,7 @@ async function getReporteDiario({ id_llenadero, fecha, query }) {
             ...formatVehiculo(i),
             dependencia: i.Dependencia?.nombre_dependencia,
             subdependencia: i.Subdependencia?.nombre,
+            tipo_combustible: i.TipoCombustible?.nombre || "S/I",
             cant_solic: i.cantidad_litros,
             cant_desp: i.cantidad_despachada,
         })),
@@ -168,6 +203,12 @@ async function getReporteDiario({ id_llenadero, fecha, query }) {
             resumen_saldos: Object.entries(saldosPorMoneda).map(([moneda, total]) => ({
                 moneda, total: total.toFixed(2),
             })),
+            por_combustible: Object.entries(totalesPorCombustible).map(([combustible, totales]) => ({
+                combustible,
+                institucional: totales.institucional.toFixed(2),
+                venta: totales.venta.toFixed(2),
+                total: totales.total.toFixed(2)
+            }))
         },
     };
 }

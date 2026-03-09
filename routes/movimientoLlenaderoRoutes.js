@@ -4,19 +4,17 @@ const { check } = require("express-validator");
 const movimientoController = require("../controllers/operaciones/movimientoLlenaderoController");
 const {
   autenticarUsuario,
-  authorizeRole,
+  authorizePermission,
 } = require("../middlewares/authMiddleware");
+const { PERMISSIONS } = require("../utils/permissions");
 const validarCampos = require("../middlewares/validationMiddleware");
 
 router.use(autenticarUsuario);
 
-// Roles permitidos para registrar movimientos de inventario
-const ROLES_PERMITIDOS = ["ADMIN", "JEFE DIVISION", "GERENTE", "ALMACENISTA"];
-
 // GET /api/movimientos-llenadero
 router.get(
   "/",
-  authorizeRole(ROLES_PERMITIDOS),
+  authorizePermission(PERMISSIONS.VIEW_INVENTARIO),
   movimientoController.listarMovimientos,
 );
 
@@ -24,7 +22,7 @@ router.get(
 router.post(
   "/",
   [
-    authorizeRole(ROLES_PERMITIDOS),
+    authorizePermission(PERMISSIONS.VIEW_INVENTARIO),
     check("id_llenadero", "El ID de llenadero es obligatorio").isInt(),
     check(
       "tipo_movimiento",

@@ -4,8 +4,9 @@ const { check } = require("express-validator");
 const llenaderoController = require("../controllers/operaciones/llenaderoController");
 const {
   autenticarUsuario,
-  authorizeRole,
+  authorizePermission,
 } = require("../middlewares/authMiddleware");
+const { PERMISSIONS } = require("../utils/permissions");
 const validarCampos = require("../middlewares/validationMiddleware");
 
 // Todas las rutas de llenaderos requieren estar logueado
@@ -21,7 +22,7 @@ router.get("/lista", llenaderoController.obtenerListaLlenaderos);
 router.post(
   "/",
   [
-    authorizeRole(["ADMIN"]),
+    authorizePermission(PERMISSIONS.MANAGE_SYSTEM),
     check("nombre_llenadero", "El nombre del llenadero es obligatorio")
       .not()
       .isEmpty(),
@@ -42,7 +43,7 @@ router.post(
 router.put(
   "/:id",
   [
-    authorizeRole(["ADMIN"]),
+    authorizePermission(PERMISSIONS.MANAGE_SYSTEM),
     check("nombre_llenadero", "El nombre no puede estar vacío")
       .optional()
       .not()
@@ -67,7 +68,7 @@ router.put(
 // DELETE /api/llenaderos/:id - Desactivar (Solo ADMIN)
 router.delete(
   "/:id",
-  [authorizeRole(["ADMIN"]), validarCampos],
+  [authorizePermission(PERMISSIONS.MANAGE_SYSTEM), validarCampos],
   llenaderoController.desactivarLlenadero,
 );
 

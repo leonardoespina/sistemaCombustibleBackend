@@ -4,8 +4,9 @@ const { check } = require("express-validator");
 const tipoCombustibleController = require("../controllers/vehiculos/tipoCombustibleController");
 const {
   autenticarUsuario,
-  authorizeRole,
+  authorizePermission,
 } = require("../middlewares/authMiddleware");
+const { PERMISSIONS } = require("../utils/permissions");
 const validarCampos = require("../middlewares/validationMiddleware");
 
 // --- RUTAS PROTEGIDAS ---
@@ -25,7 +26,7 @@ router.post(
   "/",
   [
     autenticarUsuario,
-    authorizeRole(["ADMIN"]),
+    authorizePermission(PERMISSIONS.MANAGE_SYSTEM),
     check("nombre", "El nombre es obligatorio").not().isEmpty(),
     validarCampos,
   ],
@@ -37,7 +38,7 @@ router.put(
   "/:id",
   [
     autenticarUsuario,
-    authorizeRole(["ADMIN"]),
+    authorizePermission(PERMISSIONS.MANAGE_SYSTEM),
     check("nombre", "El nombre es obligatorio").optional().not().isEmpty(),
     validarCampos,
   ],
@@ -47,7 +48,7 @@ router.put(
 // DELETE /api/tipos-combustible/:id (Desactivar - Solo Admin)
 router.delete(
   "/:id",
-  [autenticarUsuario, authorizeRole(["ADMIN"])],
+  [autenticarUsuario, authorizePermission(PERMISSIONS.MANAGE_SYSTEM)],
   tipoCombustibleController.eliminarTipoCombustible,
 );
 

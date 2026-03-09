@@ -4,8 +4,9 @@ const { check } = require("express-validator");
 const dependenciaController = require("../controllers/organizacion/dependenciaController");
 const {
   autenticarUsuario,
-  authorizeRole,
+  authorizePermission,
 } = require("../middlewares/authMiddleware");
+const { PERMISSIONS } = require("../utils/permissions");
 const validarCampos = require("../middlewares/validationMiddleware");
 
 // --- RUTAS PROTEGIDAS (Requieren Token) ---
@@ -18,7 +19,7 @@ router.post(
   "/",
   [
     autenticarUsuario,
-    authorizeRole(["ADMIN"]),
+    authorizePermission(PERMISSIONS.MANAGE_SYSTEM),
     check("id_categoria", "El ID de categoría es obligatorio").not().isEmpty(),
     check("nombre_dependencia", "El nombre de la dependencia es obligatorio")
       .not()
@@ -33,7 +34,7 @@ router.put(
   "/:id",
   [
     autenticarUsuario,
-    authorizeRole(["ADMIN"]),
+    authorizePermission(PERMISSIONS.MANAGE_SYSTEM),
     check("nombre_dependencia", "El nombre es obligatorio")
       .optional()
       .not()
@@ -47,7 +48,7 @@ router.put(
 router.delete(
   "/:id",
   autenticarUsuario,
-  authorizeRole(["ADMIN"]),
+  authorizePermission(PERMISSIONS.MANAGE_SYSTEM),
   dependenciaController.desactivarDependencia,
 );
 

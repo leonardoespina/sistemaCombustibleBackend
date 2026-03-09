@@ -14,7 +14,6 @@ exports.crearDependencia = async (data, clientIp) => {
     codigo,
     tipo_venta,
     estatus,
-    tipo_acceso_menu,
   } = data;
 
   return await executeTransaction(clientIp, async (t) => {
@@ -42,7 +41,6 @@ exports.crearDependencia = async (data, clientIp) => {
         codigo,
         tipo_venta: tipo_venta || "INSTITUCIONAL",
         estatus: estatus || "ACTIVO",
-        tipo_acceso_menu: tipo_acceso_menu || "ESTANDAR",
         fecha_registro: new Date(),
         fecha_modificacion: new Date(),
       },
@@ -90,7 +88,6 @@ exports.actualizarDependencia = async (id, data, clientIp) => {
     codigo,
     tipo_venta,
     estatus,
-    tipo_acceso_menu,
   } = data;
 
   return await executeTransaction(clientIp, async (t) => {
@@ -130,7 +127,6 @@ exports.actualizarDependencia = async (id, data, clientIp) => {
     if (codigo) dependencia.codigo = codigo;
     if (tipo_venta) dependencia.tipo_venta = tipo_venta;
     if (estatus) dependencia.estatus = estatus;
-    if (tipo_acceso_menu) dependencia.tipo_acceso_menu = tipo_acceso_menu;
 
     dependencia.fecha_modificacion = new Date();
 

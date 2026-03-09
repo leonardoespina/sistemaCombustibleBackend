@@ -4,18 +4,17 @@ const { check } = require("express-validator");
 const evaporacionController = require("../controllers/operaciones/evaporacionController");
 const {
   autenticarUsuario,
-  authorizeRole,
+  authorizePermission,
 } = require("../middlewares/authMiddleware");
+const { PERMISSIONS } = require("../utils/permissions");
 const validarCampos = require("../middlewares/validationMiddleware");
 
 router.use(autenticarUsuario);
 
-const ROLES_PERMITIDOS = ["ADMIN", "JEFE DIVISION", "GERENTE", "ALMACENISTA"];
-
 // GET /api/evaporaciones
 router.get(
   "/",
-  authorizeRole(ROLES_PERMITIDOS),
+  authorizePermission(PERMISSIONS.VIEW_INVENTARIO),
   evaporacionController.listarEvaporaciones,
 );
 
@@ -23,7 +22,7 @@ router.get(
 router.post(
   "/",
   [
-    authorizeRole(ROLES_PERMITIDOS),
+    authorizePermission(PERMISSIONS.VIEW_INVENTARIO),
     check("id_llenadero", "El ID de llenadero es obligatorio").isInt(),
     check("cantidad", "La cantidad es obligatoria y debe ser positiva").isFloat(
       { min: 0.01 },

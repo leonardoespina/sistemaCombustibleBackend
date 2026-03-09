@@ -4,8 +4,9 @@ const { check } = require("express-validator");
 const vehiculoController = require("../controllers/vehiculos/vehiculoController");
 const {
   autenticarUsuario,
-  authorizeRole,
+  authorizePermission,
 } = require("../middlewares/authMiddleware");
+const { PERMISSIONS } = require("../utils/permissions");
 const validarCampos = require("../middlewares/validationMiddleware");
 
 // Todas las rutas de vehículos requieren estar logueado
@@ -27,7 +28,7 @@ router.get(
 router.post(
   "/",
   [
-    authorizeRole(["ADMIN"]),
+    authorizePermission(PERMISSIONS.MANAGE_SYSTEM),
 
     check("id_marca", "La marca es obligatoria").isNumeric(),
     check("id_modelo", "El modelo es obligatorio").isNumeric(),
@@ -51,7 +52,7 @@ router.post(
 router.put(
   "/:id",
   [
-    authorizeRole(["ADMIN"]),
+    authorizePermission(PERMISSIONS.MANAGE_SYSTEM),
     check("placa", "La placa no puede estar vacía").optional().not().isEmpty(),
     check("id_categoria", "El ID de categoría debe ser numérico")
       .optional()
@@ -72,7 +73,7 @@ router.put(
 // DELETE /api/vehiculos/:id - Desactivar (Solo ADMIN)
 router.delete(
   "/:id",
-  [authorizeRole(["ADMIN"]), validarCampos],
+  [authorizePermission(PERMISSIONS.MANAGE_SYSTEM), validarCampos],
   vehiculoController.desactivarVehiculo,
 );
 

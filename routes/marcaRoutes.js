@@ -4,8 +4,9 @@ const { check } = require("express-validator");
 const marcaController = require("../controllers/vehiculos/marcaController");
 const {
   autenticarUsuario,
-  authorizeRole,
+  authorizePermission,
 } = require("../middlewares/authMiddleware");
+const { PERMISSIONS } = require("../utils/permissions");
 const validarCampos = require("../middlewares/validationMiddleware");
 
 // Todas las rutas de marcas requieren estar logueado
@@ -21,7 +22,7 @@ router.get("/lista", marcaController.obtenerListaMarcas);
 router.post(
   "/",
   [
-    authorizeRole(["ADMIN"]),
+    authorizePermission(PERMISSIONS.MANAGE_SYSTEM),
     check("nombre", "El nombre de la marca es obligatorio").not().isEmpty(),
     validarCampos,
   ],
@@ -32,7 +33,7 @@ router.post(
 router.put(
   "/:id",
   [
-    authorizeRole(["ADMIN"]),
+    authorizePermission(PERMISSIONS.MANAGE_SYSTEM),
     check("nombre", "El nombre no puede estar vacío")
       .optional()
       .not()
@@ -45,7 +46,7 @@ router.put(
 // DELETE /api/marcas/:id - Desactivar (Solo ADMIN)
 router.delete(
   "/:id",
-  [authorizeRole(["ADMIN"]), validarCampos],
+  [authorizePermission(PERMISSIONS.MANAGE_SYSTEM), validarCampos],
   marcaController.desactivarMarca,
 );
 

@@ -32,8 +32,31 @@ const Usuario = sequelize.define(
     },
     cedula: {
       type: DataTypes.STRING(20),
-      allowNull: false,
+      allowNull: true,
       unique: false,
+    },
+    aprobado: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+    },
+    // Nuevas columnas para el sistema RBAC
+    rol_sistema: {
+      type: DataTypes.ENUM(
+        "ADMIN",
+        "ESTANDAR",
+        "ALMACEN",
+        "SEGURIDAD",
+        "INSPECTOR",
+        "PRESIDENCIA"
+      ),
+      allowNull: false,
+      defaultValue: "ESTANDAR",
+    },
+    capacidad_solicitudes: {
+      type: DataTypes.ENUM("SOLICITANTE", "APROBADOR", "AMBOS", "NINGUNO"),
+      allowNull: false,
+      defaultValue: "SOLICITANTE",
     },
     password: {
       // Campo nuevo que agregamos con el ALTER TABLE

@@ -1,7 +1,8 @@
 const express = require("express");
 const router = express.Router();
 const solicitudController = require("../controllers/despachos/solicitudController");
-const { autenticarUsuario,  authorizeRole } = require("../middlewares/authMiddleware");
+const { autenticarUsuario, authorizePermission } = require("../middlewares/authMiddleware");
+const { PERMISSIONS } = require("../utils/permissions");
 const { criticalLimiter } = require("../middlewares/rateLimitMiddleware");
 
 // Todas las rutas requieren autenticación
@@ -21,7 +22,12 @@ router.get(
 );
 
 // Crear Solicitud - OPERACIÓN CRÍTICA (Afecta cupos)
-router.post("/", criticalLimiter, solicitudController.crearSolicitud);
+router.post(
+  "/",
+  criticalLimiter,
+  authorizePermission(PERMISSIONS.CREATE_SOLICITUD),
+  solicitudController.crearSolicitud,
+);
 
 // Listar Solicitudes (con filtros)
 router.get("/", solicitudController.listarSolicitudes);
@@ -30,7 +36,7 @@ router.get("/", solicitudController.listarSolicitudes);
 router.put(
   "/:id/aprobar",
   criticalLimiter,
-  authorizeRole(["ADMIN","GERENTE", "JEFE DIVISION"]), // Middleware de autorización por rol
+  authorizePermission(PERMISSIONS.APPROVE_DISPATCHES),
   solicitudController.aprobarSolicitud,
 );
 
@@ -46,7 +52,7 @@ router.put(
 router.put(
   "/:id/rechazar",
   criticalLimiter,
-  authorizeRole(["ADMIN","GERENTE", "JEFE DIVISION"]),
+  authorizePermission(PERMISSIONS.REJECT_SOLICITUD),
   solicitudController.rechazarSolicitud,
 );
 

@@ -41,11 +41,6 @@ const Dependencia = sequelize.define(
       type: DataTypes.ENUM("ACTIVO", "INACTIVO"),
       defaultValue: "ACTIVO",
     },
-    tipo_acceso_menu: {
-      type: DataTypes.ENUM("ESTANDAR", "SEGURIDAD", "ALMACEN", "PRESIDENCIA"),
-      defaultValue: "ESTANDAR",
-      allowNull: false,
-    },
     fecha_registro: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,

@@ -4,8 +4,9 @@ const { check } = require("express-validator");
 const precioController = require("../controllers/operaciones/precioController");
 const {
   autenticarUsuario,
-  authorizeRole,
+  authorizePermission,
 } = require("../middlewares/authMiddleware");
+const { PERMISSIONS } = require("../utils/permissions");
 const validarCampos = require("../middlewares/validationMiddleware");
 
 // ============================================================
@@ -20,7 +21,7 @@ router.post(
   "/monedas",
   [
     autenticarUsuario,
-    authorizeRole(["ADMIN"]),
+    authorizePermission(PERMISSIONS.MANAGE_SYSTEM),
     check("nombre", "El nombre de la moneda es obligatorio").not().isEmpty(),
     check("simbolo", "El símbolo de la moneda es obligatorio").not().isEmpty(),
     validarCampos,
@@ -31,7 +32,7 @@ router.post(
 // PUT /api/precios/monedas/:id (Actualizar moneda) - Solo ADMIN
 router.put(
   "/monedas/:id",
-  [autenticarUsuario, authorizeRole(["ADMIN"]), validarCampos],
+  [autenticarUsuario, authorizePermission(PERMISSIONS.MANAGE_SYSTEM), validarCampos],
   precioController.actualizarMoneda,
 );
 
@@ -39,7 +40,7 @@ router.put(
 router.delete(
   "/monedas/:id",
   autenticarUsuario,
-  authorizeRole(["ADMIN"]),
+  authorizePermission(PERMISSIONS.MANAGE_SYSTEM),
   precioController.desactivarMoneda,
 );
 
@@ -66,7 +67,7 @@ router.post(
   "/actualizar",
   [
     autenticarUsuario,
-    authorizeRole(["ADMIN"]),
+    authorizePermission(PERMISSIONS.MANAGE_SYSTEM),
     check(
       "id_tipo_combustible",
       "El ID del tipo de combustible es obligatorio",

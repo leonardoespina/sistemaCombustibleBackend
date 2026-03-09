@@ -4,8 +4,9 @@ const { check } = require("express-validator");
 const usuarioController = require("../controllers/administracion/usuarioController");
 const {
   autenticarUsuario,
-  authorizeRole,
+  authorizePermission,
 } = require("../middlewares/authMiddleware");
+const { PERMISSIONS } = require("../utils/permissions");
 const validarCampos = require("../middlewares/validationMiddleware");
 const {
   loginLimiter,
@@ -61,7 +62,7 @@ router.post(
   "/",
   [
     autenticarUsuario,
-    authorizeRole(["ADMIN"]),
+    authorizePermission(PERMISSIONS.MANAGE_USERS),
     creationLimiter, // 30 creaciones cada 10 minutos
     check("nombre", "El nombre es obligatorio").not().isEmpty(),
     check("apellido", "El apellido es obligatorio").not().isEmpty(),
@@ -77,7 +78,7 @@ router.put(
   "/:id",
   [
     autenticarUsuario,
-    authorizeRole(["ADMIN"]),
+    authorizePermission(PERMISSIONS.MANAGE_USERS),
     check("nombre", "El nombre es obligatorio").optional().not().isEmpty(),
     check("apellido", "El apellido es obligatorio").optional().not().isEmpty(),
     // Si envían password, validamos longitud
@@ -91,7 +92,7 @@ router.put(
 router.delete(
   "/:id",
   autenticarUsuario,
-  authorizeRole(["ADMIN"]),
+  authorizePermission(PERMISSIONS.MANAGE_USERS),
   usuarioController.desactivarUsuario,
 );
 

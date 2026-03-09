@@ -3,8 +3,9 @@ const router = express.Router();
 const cupoController = require("../controllers/despachos/cupoController");
 const {
   autenticarUsuario,
-  authorizeRole,
+  authorizePermission,
 } = require("../middlewares/authMiddleware");
+const { PERMISSIONS } = require("../utils/permissions");
 const {
   criticalLimiter,
   creationLimiter,
@@ -13,20 +14,20 @@ const {
 // --- RUTAS DE CONFIGURACIÓN (Cupo Base) - Solo ADMIN ---
 router.get(
   "/base",
-  [autenticarUsuario, authorizeRole(["ADMIN"])],
+  [autenticarUsuario, authorizePermission(PERMISSIONS.MANAGE_SYSTEM)],
   cupoController.obtenerCuposBase,
 );
 
 // Crear Cupo Base - Solo ADMIN - CON RATE LIMITING
 router.post(
   "/base",
-  [autenticarUsuario, authorizeRole(["ADMIN"]), creationLimiter],
+  [autenticarUsuario, authorizePermission(PERMISSIONS.MANAGE_SYSTEM), creationLimiter],
   cupoController.crearCupoBase,
 );
 
 router.put(
   "/base/:id",
-  [autenticarUsuario, authorizeRole(["ADMIN"])],
+  [autenticarUsuario, authorizePermission(PERMISSIONS.MANAGE_SYSTEM)],
   cupoController.actualizarCupoBase,
 );
 
@@ -43,21 +44,21 @@ router.get(
 // Consumir Cupo - OPERACIÓN CRÍTICA (Afecta inventario)
 router.post(
   "/consumir",
-  [autenticarUsuario, authorizeRole(["ADMIN"]), criticalLimiter],
+  [autenticarUsuario, authorizePermission(PERMISSIONS.MANAGE_SYSTEM), criticalLimiter],
   cupoController.consumirCupo,
 );
 
 // Recargar Cupo - OPERACIÓN CRÍTICA (Afecta inventario)
 router.post(
   "/recargar",
-  [autenticarUsuario, authorizeRole(["ADMIN"]), criticalLimiter],
+  [autenticarUsuario, authorizePermission(PERMISSIONS.MANAGE_SYSTEM), criticalLimiter],
   cupoController.recargarCupo,
 );
 
 // --- RUTA DE REINICIO MANUAL (Para pruebas) - Solo ADMIN ---
 router.post(
   "/reiniciar-mes",
-  [autenticarUsuario, authorizeRole(["ADMIN"])],
+  [autenticarUsuario, authorizePermission(PERMISSIONS.MANAGE_SYSTEM)],
   async (req, res) => {
     const resultado = await cupoController.reiniciarCuposMensuales();
     if (resultado.success) {

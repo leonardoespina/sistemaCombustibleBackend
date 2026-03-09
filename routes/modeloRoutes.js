@@ -4,8 +4,9 @@ const { check } = require("express-validator");
 const modeloController = require("../controllers/vehiculos/modeloController");
 const {
   autenticarUsuario,
-  authorizeRole,
+  authorizePermission,
 } = require("../middlewares/authMiddleware");
+const { PERMISSIONS } = require("../utils/permissions");
 const validarCampos = require("../middlewares/validationMiddleware");
 
 // Todas las rutas de modelos requieren estar autenticado
@@ -19,7 +20,7 @@ router.get("/", modeloController.obtenerModelos);
 router.post(
   "/",
   [
-    authorizeRole(["ADMIN"]),
+    authorizePermission(PERMISSIONS.MANAGE_SYSTEM),
     check("nombre", "El nombre es obligatorio").not().isEmpty(),
     check(
       "id_marca",
@@ -34,7 +35,7 @@ router.post(
 router.put(
   "/:id",
   [
-    authorizeRole(["ADMIN"]),
+    authorizePermission(PERMISSIONS.MANAGE_SYSTEM),
     check("nombre", "El nombre no puede estar vacío")
       .optional()
       .not()
@@ -48,7 +49,7 @@ router.put(
 // DELETE /api/modelos/:id (Desactivar) - Solo ADMIN
 router.delete(
   "/:id",
-  [authorizeRole(["ADMIN"]), validarCampos],
+  [authorizePermission(PERMISSIONS.MANAGE_SYSTEM), validarCampos],
   modeloController.desactivarModelo,
 );
 
